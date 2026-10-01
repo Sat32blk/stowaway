@@ -1,0 +1,7 @@
+# Normally you don't edit this file: tick containers in the dashboard instead.
+settings:
+  # Status checks from Heimdall/Homarr matching these never wake a container
+  # or reset its idle timer.
+  ignore_user_agents: []
+  ignore_ips: []
+services: {}

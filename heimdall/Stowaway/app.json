@@ -1,0 +1,10 @@
+{
+  "appid": "a754377641aa46d940b7d213aa988d7d8ad8226e",
+  "name": "Stowaway",
+  "website": "https://github.com/Sat32blk/stowaway",
+  "license": "MIT License",
+  "description": "Puts Docker containers to sleep when idle and wakes them when someone opens their link. Shows whether an app is awake and when it restarts next.",
+  "enhanced": true,
+  "tile_background": "dark",
+  "icon": "stowaway.svg"
+}

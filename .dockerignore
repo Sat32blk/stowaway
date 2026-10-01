@@ -1,0 +1,6 @@
+config/
+**/__pycache__/
+.git/
+.github/
+unraid/
+*.zip

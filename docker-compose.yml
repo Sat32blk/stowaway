@@ -1,0 +1,25 @@
+services:
+  stowaway:
+    image: ghcr.io/sat32blk/stowaway:latest
+    build: .                                 # used when you run "docker compose up -d --build" in this folder
+    container_name: stowaway
+    restart: unless-stopped
+    # Host networking lets Stowaway open a link port for each app you enable
+    # in the dashboard, and the HTTPS port if you turn HTTPS on in Settings,
+    # with no port list to maintain here.
+    network_mode: host
+    # Lets Stowaway add a small helper interface so it can reach containers
+    # on macvlan networks (Linux blocks the host from talking to them directly).
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - DASHBOARD_PORT=8880                  # dashboard at http://server:8880
+      - TZ=America/New_York                  # for awake hours (can also be set in Settings)
+      - REAP_INTERVAL=5
+      # - ALLOWED_HOSTS=nas.example.com       # extra names for the dashboard (IPs and .local/.lan names always work)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config:/config                     # settings, certificates, account
+      # For updating apps whose images are in a private registry, share the server's Docker login:
+      # - /root/.docker/config.json:/root/.docker/config.json:ro
+

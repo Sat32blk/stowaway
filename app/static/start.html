@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Starting…</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f5f8; --card: #ffffff; --line: #e3e6ec; --fg: #1b2130; --muted: #687085;
+  --accent: #2f6fed; --accent-soft: #dfe8fc; --bad: #d14343; --bad-soft: #fbe7e7;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #101318; --card: #181c24; --line: #2a303b; --fg: #e5e8ee; --muted: #8b93a5;
+    --accent: #6b98ff; --accent-soft: #1f2a45; --bad: #f07272; --bad-soft: #3a1c1c;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px;
+  background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.card { width: min(420px, 100%); background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+  padding: 40px 32px 30px; text-align: center; box-shadow: 0 10px 30px rgb(0 0 0 / .06); }
+h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+p { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+.foot { margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted);
+  display: flex; justify-content: space-between; gap: 12px; }
+.foot b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.spinner { width: 46px; height: 46px; margin: 0 auto 24px; border-radius: 50%;
+  border: 4px solid var(--accent-soft); border-top-color: var(--accent); animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.count { position: relative; width: 112px; height: 112px; margin: 0 auto 22px; }
+.count svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.count circle { fill: none; stroke-width: 8; }
+.count .track { stroke: var(--accent-soft); }
+.count .ring { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+.count .num { position: absolute; inset: 0; display: grid; place-items: center; font-size: 42px; font-weight: 700;
+  font-variant-numeric: tabular-nums; }
+.count .num.small { font-size: 18px; }
+.pulse .num { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+
+.icon-bad { width: 56px; height: 56px; margin: 0 auto 20px; border-radius: 50%; background: var(--bad-soft);
+  color: var(--bad); display: grid; place-items: center; font-size: 30px; font-weight: 800; }
+.detail { margin: 18px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--bad-soft); color: var(--bad);
+  font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-align: left; overflow-wrap: anywhere; }
+.buttons { display: flex; gap: 10px; justify-content: center; margin-top: 22px; flex-wrap: wrap; }
+button, a.btn { font: inherit; font-size: 15px; font-weight: 600; border-radius: 10px; padding: 9px 18px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--card); color: var(--fg); text-decoration: none; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.preview { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: 600;
+  background: var(--accent-soft); color: var(--accent); padding: 3px 12px; border-radius: 99px; }
+[hidden] { display: none !important; }
+
+/* ===== Modern theme ===== */
+:root {
+  --bg: #eef1f7; --card: rgb(255 255 255 / .62); --line: rgb(255 255 255 / .8);
+  --grad: linear-gradient(135deg, #4f7bff 0%, #8b5cf6 55%, #ec4899 100%);
+  --blob1: #7aa2ff; --blob2: #c4a1ff; --blob3: #6ee7d8; --blob4: #fbb6dc; --blob-op: .6;
+  --dot: rgb(30 40 70 / .09); --sep: rgb(30 40 70 / .08);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #090c12; --card: rgb(22 26 36 / .55); --line: rgb(255 255 255 / .09);
+    --blob1: #2f5bff; --blob2: #7c3aed; --blob3: #0d9488; --blob4: #be185d; --blob-op: .38;
+    --dot: rgb(255 255 255 / .055); --sep: rgb(255 255 255 / .08);
+  }
+}
+body { background: var(--bg); overflow: hidden; }
+.bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.bg i { position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(90px);
+  opacity: var(--blob-op); animation: drift 30s ease-in-out infinite alternate; will-change: transform; }
+.bg i:nth-child(1) { background: var(--blob1); top: -25vmax; left: -15vmax; }
+.bg i:nth-child(2) { background: var(--blob2); top: -15vmax; right: -25vmax; animation-duration: 36s; animation-delay: -9s; }
+.bg i:nth-child(3) { background: var(--blob3); bottom: -30vmax; left: 5vmax; animation-duration: 40s; animation-delay: -18s; }
+.bg i:nth-child(4) { background: var(--blob4); bottom: -25vmax; right: -15vmax; width: 45vmax; height: 45vmax; animation-duration: 33s; animation-delay: -4s; }
+.bg::after { content: ""; position: absolute; inset: 0;
+  background-image: radial-gradient(var(--dot) 1px, transparent 1.3px); background-size: 24px 24px;
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 20%, transparent 70%);
+          mask-image: radial-gradient(circle at 50% 50%, #000 20%, transparent 70%); }
+@keyframes drift {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(8vmax, 6vmax) scale(1.15); }
+  100% { transform: translate(-6vmax, 8vmax) scale(.92); }
+}
+.card { background: var(--card); border-color: var(--line); border-radius: 24px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 24px 60px rgb(20 20 60 / .14);
+  -webkit-backdrop-filter: blur(22px) saturate(170%); backdrop-filter: blur(22px) saturate(170%);
+  animation: rise .5s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(12px) scale(.98); } }
+.foot { border-top-color: var(--sep); }
+
+.spinner { position: relative; width: 58px; height: 58px; border: 0; border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 15%, #4f7bff 45%, #8b5cf6 75%, #ec4899);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+  animation: spin 1s linear infinite; margin-bottom: 26px; }
+.glow { position: relative; width: 58px; margin: 0 auto; }
+.glow::before { content: ""; position: absolute; inset: -14px; border-radius: 50%; background: var(--grad);
+  filter: blur(22px); opacity: .35; animation: breathe 2.4s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: .15; transform: scale(.9); } }
+.count .track { stroke: color-mix(in srgb, #8b5cf6 18%, transparent); }
+.count .ring { stroke: url(#ringGrad); filter: drop-shadow(0 4px 10px rgb(99 102 241 / .35)); }
+.count .num { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+h1 { font-size: 24px; letter-spacing: -0.02em; }
+button.primary { background: var(--grad); border-color: transparent; box-shadow: 0 8px 22px rgb(99 102 241 / .38); }
+button, a.btn { border-radius: 12px; }
+a.btn, button:not(.primary) { background: rgb(255 255 255 / .12); border-color: var(--line); }
+.icon-bad { box-shadow: 0 0 0 8px color-mix(in srgb, var(--bad) 10%, transparent); }
+.upd-icon { position: relative; width: 58px; height: 58px; margin: 0 auto 24px; border-radius: 18px; background: var(--grad);
+  display: grid; place-items: center; box-shadow: 0 10px 26px rgb(99 102 241 / .4), inset 0 1px 0 rgb(255 255 255 / .35); }
+.upd-icon svg { width: 28px; height: 28px; animation: bob 1.6s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(3px); } }
+.pbar { height: 10px; border-radius: 99px; margin-top: 22px; overflow: hidden;
+  background: color-mix(in srgb, #8b5cf6 16%, transparent); }
+.pbar i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--grad); background-size: 200% 100%;
+  transition: width .6s ease; animation: flow 1.8s linear infinite; }
+@keyframes flow { to { background-position: -200% 0; } }
+#updView .foot b { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .upd-icon svg, .pbar i { animation: none; } }
+@media (prefers-color-scheme: dark) { .preview { background: rgb(255 255 255 / .08) !important; color: #a5b8ff !important; } }
+.preview { background: rgb(255 255 255 / .55); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+@media (prefers-reduced-motion: reduce) { .bg i, .glow::before, .card { animation: none; } }
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<div class="preview" id="previewTag" hidden>Preview</div>
+
+<main class="card" id="startView">
+  <div id="visual"></div>
+  <h1 id="title"></h1>
+  <p id="subtitle"></p>
+  <div class="foot"><span id="stateText">Starting</span><span><b id="elapsed">0s</b></span></div>
+</main>
+
+<main class="card" id="updView" hidden>
+  <div class="upd-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg></div>
+  <h1 id="updTitle"></h1>
+  <p id="updSub"></p>
+  <div class="pbar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><i id="updBar"></i></div>
+  <div class="foot"><span id="updPhase">Checking</span><span><b id="updPct">0%</b></span></div>
+</main>
+
+<main class="card" id="offView" hidden>
+  <div class="upd-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></div>
+  <h1 id="offTitle"></h1>
+  <p>It's been switched off for now, for example while nobody's home. This page opens it automatically as soon as it's switched back on.</p>
+  <div class="buttons">
+    <a class="btn" id="offDash" target="_blank" rel="noopener">Open dashboard</a>
+  </div>
+</main>
+
+<main class="card" id="errorView" hidden>
+  <div class="icon-bad">!</div>
+  <h1 id="errTitle"></h1>
+  <p>Stowaway tried to start it but it didn't come up.</p>
+  <div class="detail" id="errDetail"></div>
+  <div class="buttons">
+    <button class="primary" id="retry">Try again</button>
+    <a class="btn" id="dash" target="_blank" rel="noopener">Open dashboard</a>
+  </div>
+</main>
+
+<script>
+const C = __CONFIG__;
+const $ = (id) => document.getElementById(id);
+const name = C.name;
+const fill = (t) => String(t || '').split('%name%').join(name).split('%Container Name%').join(name);
+const t0 = Date.now();
+let eta = C.eta, etaBase = Date.now(), done = false;
+
+const styles = {
+  please_wait:      { title: 'Please wait', sub: `${name} is starting up…` },
+  starting_service: { title: 'Starting service', sub: `Waking up ${name}` },
+  loading_name:     { title: `Loading ${name}`, sub: 'This only takes a moment' },
+  countdown:        { title: 'Ready in…', sub: `${name} is starting up` },
+  custom:           { title: fill(C.custom) || `Loading ${name}`, sub: '' },
+};
+const style = styles[C.style] ? C.style : 'loading_name';
+document.title = style === 'countdown' ? `Starting ${name}` : styles[style].title;
+$('title').textContent = styles[style].title;
+$('subtitle').textContent = styles[style].sub;
+$('subtitle').hidden = !styles[style].sub;
+
+const R = 48, CIRC = 2 * Math.PI * R;
+if (style === 'countdown') {
+  $('visual').innerHTML = `<div class="count" id="count"><svg viewBox="0 0 112 112">
+    <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f7bff"/><stop offset=".55" stop-color="#8b5cf6"/><stop offset="1" stop-color="#ec4899"/>
+    </linearGradient></defs>
+    <circle class="track" cx="56" cy="56" r="${R}"/><circle class="ring" id="ring" cx="56" cy="56" r="${R}"
+    stroke-dasharray="${CIRC}" stroke-dashoffset="0"/></svg><div class="num" id="num"></div></div>`;
+} else {
+  $('visual').innerHTML = '<div class="glow"><div class="spinner"></div></div>';
+}
+
+function remaining() {
+  if (eta == null) return null;
+  return eta - (Date.now() - etaBase) / 1000;
+}
+function tick() {
+  if (done) return;
+  $('elapsed').textContent = Math.floor((Date.now() - t0) / 1000) + 's';
+  if (style !== 'countdown') return;
+  const left = remaining(), total = C.eta_total || eta || 10;
+  const n = left == null ? null : Math.ceil(left);
+  const num = $('num'), ring = $('ring');
+  if (n != null && n > 0) {
+    num.textContent = n; num.classList.remove('small'); $('count').classList.remove('pulse');
+    $('title').textContent = `Ready in ${n}`;
+    ring.style.strokeDashoffset = CIRC * (1 - Math.max(0, left) / total);
+  } else {
+    num.textContent = 'Almost'; num.classList.add('small'); $('count').classList.add('pulse');
+    $('title').textContent = 'Almost ready';
+    ring.style.strokeDashoffset = CIRC;
+  }
+}
+
+function mb(n) { return n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : Math.round(n / 1e6) + ' MB'; }
+function showUpdate(u) {
+  u = u || { phase: 'downloading', pct: 0 };
+  $('startView').hidden = true;
+  $('errorView').hidden = true;
+  $('updView').hidden = false;
+  document.title = `Updating ${name}`;
+  $('updTitle').textContent = `Updating ${name}`;
+  const phase = { downloading: 'Downloading', unpacking: 'Unpacking', installing: 'Installing' }[u.phase] || 'Updating';
+  $('updSub').textContent = u.phase === 'installing' ? 'Installing the new version…'
+    : u.total_bytes ? `Downloading the newest version · ${mb(u.done_bytes || 0)} of ${mb(u.total_bytes)}`
+    : 'Downloading the newest version…';
+  $('updPhase').textContent = phase;
+  const pct = Math.max(0, Math.min(100, Math.round(u.pct || 0)));
+  $('updPct').textContent = pct + '%';
+  $('updBar').style.width = pct + '%';
+  $('updBar').parentElement.setAttribute('aria-valuenow', pct);
+}
+function showError(msg) {
+  done = true;
+  $('updView').hidden = true;
+  $('startView').hidden = true;
+  $('errorView').hidden = false;
+  document.title = `${name} failed to start`;
+  $('errTitle').textContent = `${name} failed to start`;
+  $('errDetail').textContent = msg || 'No details were reported.';
+}
+function showStart() {
+  done = false;
+  $('errorView').hidden = true;
+  if (!$('updView').hidden) {
+    $('updView').hidden = true;
+    document.title = style === 'countdown' ? `Starting ${name}` : styles[style].title;
+    if (eta == null) { eta = C.eta_total || 10; etaBase = Date.now(); }   // give the countdown something to count
+  }
+  $('startView').hidden = false;
+}
+
+function showOff() {
+  $('startView').hidden = true; $('updView').hidden = true; $('errorView').hidden = true;
+  $('offView').hidden = false;
+  document.title = `${name} is switched off`;
+  $('offTitle').textContent = `${name} is switched off`;
+}
+$('offDash').href = C.dashboard_url;
+$('dash').href = C.dashboard_url;
+$('retry').onclick = async () => {
+  if (C.preview) { showStart(); return; }
+  $('retry').disabled = true;
+  try { await fetch(C.wake_url, { method: 'POST', headers: { 'X-Stowaway': '1' } }); } catch {}
+  eta = C.eta_total; etaBase = Date.now();
+  showStart();
+  $('retry').disabled = false;
+  setTimeout(poll, 1000);
+};
+
+async function poll() {
+  if (done) return;
+  try {
+    const r = await fetch(C.status_url, { cache: 'no-store' });
+    const d = await r.json();
+    if (d.wake_blocked && d.state !== 'running') { showOff(); setTimeout(poll, 5000); return; }
+    if (!$('offView').hidden) { location.reload(); return; }   // switched back on: this visit wakes it
+    if (d.state === 'running') {
+      $('stateText').textContent = 'Opening';
+      if (C.go_to) location.replace(C.go_to); else location.reload();
+      return;
+    }
+    if (d.state === 'failed') { showError(d.error); return; }
+    if (d.state === 'updating') { showUpdate(d.update); setTimeout(poll, 700); return; }
+    showStart();
+    $('stateText').textContent = d.state === 'stopping' ? 'Finishing previous shutdown' : 'Starting';
+    if (d.eta != null) { eta = d.eta; etaBase = Date.now(); }
+  } catch {}
+  setTimeout(poll, 1000);
+}
+
+if (C.preview) {
+  $('previewTag').hidden = false;
+  if (C.preview === 'error') showError(C.error);
+  else if (C.blocked) showOff();
+  else if (C.preview === 'update') {
+    // Play the update, then hand over to the chosen start page, on a loop.
+    let p = 0;
+    const total = 180e6;
+    setInterval(() => {
+      p += 2;
+      if (p <= 100) showUpdate({ phase: p < 90 ? 'downloading' : p < 100 ? 'unpacking' : 'installing', pct: p,
+                                 done_bytes: Math.min(total, total * p / 90), total_bytes: total });
+      else if (p === 102) { showStart(); eta = C.eta_total; etaBase = Date.now(); }
+      else if (p > 150) p = 0;
+    }, 120);
+  }
+  else if (style === 'countdown') {
+    // Loop the countdown so the preview shows the whole animation.
+    setInterval(() => { if ((remaining() ?? 0) < -2) { eta = C.eta_total; etaBase = Date.now(); } }, 500);
+  }
+} else if (C.blocked) {
+  showOff();
+  setTimeout(poll, 5000);
+} else {
+  if (C.state === 'updating') showUpdate(C.update);
+  setTimeout(poll, C.state === 'updating' ? 500 : 1000);
+}
+setInterval(tick, 250);
+tick();
+</script>
+</body>
+</html>

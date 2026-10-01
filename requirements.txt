@@ -1,0 +1,13 @@
+# Web server and proxy (kept small on purpose: Stowaway should use as little as it saves)
+starlette>=0.40
+uvicorn>=0.30
+httptools>=0.6
+websockets>=15
+httpx>=0.27
+pyyaml>=6.0
+tzdata>=2024.1
+# HTTPS certificates (only loaded when HTTPS is turned on)
+cryptography>=42
+certbot>=2.9
+certbot-dns-cloudflare>=2.9
+certbot-dns-duckdns>=1.3

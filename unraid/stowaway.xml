@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!-- Unraid template. Copy to /boot/config/plugins/dockerMan/templates-user/my-stowaway.xml,
+     then Docker > Add Container > Template: stowaway. -->
+<Container version="2">
+  <Name>stowaway</Name>
+  <Repository>ghcr.io/sat32blk/stowaway:latest</Repository>
+  <Registry>https://github.com/Sat32blk/stowaway/pkgs/container/stowaway</Registry>
+  <Network>host</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/Sat32blk/stowaway/issues</Support>
+  <Project>https://github.com/Sat32blk/stowaway</Project>
+  <Overview>Starts containers when someone opens their link and puts them back to sleep when idle. Also schedules restarts and updates. Web dashboard on port 8880.</Overview>
+  <Category>Tools: Network:Management</Category>
+  <WebUI>http://[IP]:8880/_stowaway</WebUI>
+  <ExtraParams>--cap-add=NET_ADMIN</ExtraParams>
+  <Config Name="Config" Target="/config" Default="/mnt/user/appdata/stowaway" Mode="rw" Description="Settings, certificates and your account" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/stowaway</Config>
+  <Config Name="Docker socket" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="rw" Description="Lets Stowaway start, stop and update containers" Type="Path" Display="advanced" Required="true" Mask="false">/var/run/docker.sock</Config>
+  <Config Name="Dashboard port" Target="DASHBOARD_PORT" Default="8880" Mode="" Description="Port of the Stowaway dashboard (host networking, so no port mapping)" Type="Variable" Display="always" Required="true" Mask="false">8880</Config>
+  <Config Name="Time zone" Target="TZ" Default="America/New_York" Mode="" Description="For awake hours and scheduled restarts (can also be set in Settings)" Type="Variable" Display="always" Required="false" Mask="false">America/New_York</Config>
+</Container>

@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stowaway</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #eef1f7; --card: rgb(255 255 255 / .66); --line: rgb(255 255 255 / .85); --fg: #1b2130; --muted: #687085;
+  --field: rgb(255 255 255 / .75); --field-line: rgb(30 40 70 / .14);
+  --accent: #4f7bff; --ok: #1f9d61; --bad: #d14343; --bad-bg: #fbe7e7;
+  --grad: linear-gradient(135deg, #4f7bff 0%, #8b5cf6 55%, #ec4899 100%);
+  --blob1: #7aa2ff; --blob2: #c4a1ff; --blob3: #6ee7d8; --blob4: #fbb6dc; --blob-op: .6;
+  --dot: rgb(30 40 70 / .09);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #090c12; --card: rgb(22 26 36 / .6); --line: rgb(255 255 255 / .09); --fg: #e5e8ee; --muted: #8b93a5;
+    --field: rgb(10 13 19 / .6); --field-line: rgb(255 255 255 / .1);
+    --accent: #7b9dff; --ok: #4cc98c; --bad: #f07272; --bad-bg: #3a1c1c;
+    --blob1: #2f5bff; --blob2: #7c3aed; --blob3: #0d9488; --blob4: #be185d; --blob-op: .38;
+    --dot: rgb(255 255 255 / .055);
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px;
+  background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.bg i { position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(90px);
+  opacity: var(--blob-op); animation: drift 34s ease-in-out infinite alternate; }
+.bg i:nth-child(1) { background: var(--blob1); top: -25vmax; left: -15vmax; }
+.bg i:nth-child(2) { background: var(--blob2); top: -15vmax; right: -25vmax; animation-duration: 40s; animation-delay: -9s; }
+.bg i:nth-child(3) { background: var(--blob3); bottom: -30vmax; left: 5vmax; animation-duration: 46s; animation-delay: -18s; }
+.bg i:nth-child(4) { background: var(--blob4); bottom: -25vmax; right: -15vmax; width: 45vmax; height: 45vmax; animation-duration: 37s; animation-delay: -4s; }
+.bg::after { content: ""; position: absolute; inset: 0;
+  background-image: radial-gradient(var(--dot) 1px, transparent 1.3px); background-size: 24px 24px;
+  -webkit-mask-image: radial-gradient(circle at 50% 45%, #000 20%, transparent 70%);
+          mask-image: radial-gradient(circle at 50% 45%, #000 20%, transparent 70%); }
+@keyframes drift { 50% { transform: translate(8vmax, 6vmax) scale(1.15); } 100% { transform: translate(-6vmax, 8vmax) scale(.92); } }
+@media (prefers-reduced-motion: reduce) { .bg i, .card { animation: none; } }
+
+.card { width: min(400px, 100%); background: var(--card); border: 1px solid var(--line); border-radius: 24px;
+  padding: 34px 30px 28px; box-shadow: 0 24px 60px rgb(20 20 60 / .16);
+  -webkit-backdrop-filter: blur(22px) saturate(170%); backdrop-filter: blur(22px) saturate(170%);
+  animation: rise .45s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(12px) scale(.98); } }
+.logo { width: 48px; height: 48px; border-radius: 15px; background: var(--grad); display: grid; place-items: center;
+  margin: 0 auto 16px; box-shadow: 0 8px 22px rgb(99 102 241 / .38), inset 0 1px 0 rgb(255 255 255 / .35); }
+.logo svg { width: 24px; height: 24px; }
+h1 { font-size: 22px; letter-spacing: -0.02em; margin: 0 0 4px; text-align: center; }
+h1 span { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.lead { color: var(--muted); text-align: center; margin: 0 0 22px; font-size: 14px; }
+form { display: grid; gap: 14px; }
+label { display: grid; gap: 5px; font-size: 13px; font-weight: 600; }
+.pw { position: relative; }
+input { font: inherit; font-size: 15px; padding: 10px 12px; border-radius: 11px; width: 100%;
+  border: 1px solid var(--field-line); background: var(--field); color: var(--fg); }
+.pw input { padding-right: 60px; }
+input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: -1px; }
+.show { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent;
+  color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; padding: 6px 8px; cursor: pointer; border-radius: 8px; }
+.show:hover { color: var(--fg); }
+.rules { list-style: none; padding: 0; margin: -2px 0 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 13px; color: var(--muted); }
+.rules li { display: flex; align-items: center; gap: 7px; transition: color .15s; }
+.rules li::before { content: ""; width: 14px; height: 14px; border-radius: 50%; flex: none;
+  border: 1.5px solid color-mix(in srgb, var(--muted) 60%, transparent); transition: all .15s; }
+.rules li.ok { color: var(--ok); }
+.rules li.ok::before { border-color: var(--ok); background: var(--ok)
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/10px no-repeat; }
+button.primary { font: inherit; font-size: 15px; font-weight: 650; border: 0; border-radius: 12px; padding: 11px 16px;
+  color: #fff; background: var(--grad); cursor: pointer; box-shadow: 0 8px 22px rgb(99 102 241 / .35); margin-top: 4px;
+  transition: opacity .15s, transform .1s; }
+button.primary:disabled { opacity: .45; cursor: default; box-shadow: none; }
+button.primary:active:not(:disabled) { transform: translateY(1px); }
+.err { font-size: 13px; color: var(--bad); background: var(--bad-bg); padding: 8px 12px; border-radius: 10px; }
+.err:empty { display: none; }
+.note { font-size: 12px; color: var(--muted); text-align: center; margin: 18px 0 0; }
+.note code { font-size: 11px; background: color-mix(in srgb, var(--muted) 14%, transparent); padding: 2px 5px; border-radius: 5px; user-select: all; }
+.block { text-align: center; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+<main class="card">
+  <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 7.2a8 8 0 1 0 11.4 0"/></svg></div>
+
+  <!-- first visit -->
+  <section id="setup" hidden>
+    <h1>Welcome to Stow<span>away</span></h1>
+    <p class="lead">Create the account you'll use to sign in.</p>
+    <form id="setupForm" autocomplete="on">
+      <label>Username
+        <input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required minlength="3" maxlength="32"></label>
+      <label>Password
+        <span class="pw"><input name="password" type="password" autocomplete="new-password" required maxlength="128">
+        <button type="button" class="show">Show</button></span></label>
+      <ul class="rules" id="rules">
+        <li data-r="len">8 or more characters</li>
+        <li data-r="letter">A letter</li>
+        <li data-r="number">A number</li>
+        <li data-r="special">A special character</li>
+        <li data-r="match">Passwords match</li>
+      </ul>
+      <label>Confirm password
+        <span class="pw"><input name="confirm" type="password" autocomplete="new-password" required maxlength="128">
+        <button type="button" class="show">Show</button></span></label>
+      <div class="err" id="setupErr" role="alert"></div>
+      <button class="primary" type="submit" disabled>Create account</button>
+    </form>
+  </section>
+
+  <section id="blocked" hidden>
+    <h1>Welcome to Stow<span>away</span></h1>
+    <p class="block">For safety, the first account can only be created from a device on your home network.</p>
+  </section>
+
+  <!-- every visit after that -->
+  <section id="login" hidden>
+    <h1>Sign in to Stow<span>away</span></h1>
+    <p class="lead">Your containers, on demand.</p>
+    <form id="loginForm" autocomplete="on">
+      <label>Username
+        <input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+      <label>Password
+        <span class="pw"><input name="password" type="password" autocomplete="current-password" required>
+        <button type="button" class="show">Show</button></span></label>
+      <div class="err" id="loginErr" role="alert"></div>
+      <button class="primary" type="submit">Sign in</button>
+    </form>
+    <p class="note">Forgot your password? On the server, run<br><code>docker exec stowaway python -m app.auth reset</code></p>
+  </section>
+</main>
+
+<script>
+const BASE = location.pathname.replace(/\/$/, '');
+const $ = (id) => document.getElementById(id);
+
+async function post(path, body) {
+  const r = await fetch(BASE + path, {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-Stowaway': '1' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    let msg = 'Something went wrong (' + r.status + ').';
+    try { const d = await r.json(); if (d.detail) msg = d.detail; } catch {}
+    throw new Error(msg);
+  }
+}
+
+document.querySelectorAll('.show').forEach(b => b.addEventListener('click', () => {
+  const i = b.previousElementSibling, hide = i.type === 'text';
+  i.type = hide ? 'password' : 'text';
+  b.textContent = hide ? 'Show' : 'Hide';
+}));
+
+/* ---- setup ---- */
+const sf = $('setupForm');
+function checkRules() {
+  const pw = sf.password.value;
+  const res = {
+    len: pw.length >= 8,
+    letter: /[A-Za-z]/.test(pw),
+    number: /[0-9]/.test(pw),
+    special: /[^A-Za-z0-9]/.test(pw),
+    match: pw.length > 0 && pw === sf.confirm.value,
+  };
+  for (const li of $('rules').children) li.classList.toggle('ok', res[li.dataset.r]);
+  const nameOk = /^[A-Za-z0-9._@-]{3,32}$/.test(sf.username.value.trim());
+  sf.querySelector('button.primary').disabled = !(nameOk && Object.values(res).every(Boolean));
+}
+['input', 'change'].forEach(ev => sf.addEventListener(ev, checkRules));
+sf.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('setupErr').textContent = '';
+  const btn = sf.querySelector('button.primary');
+  btn.disabled = true;
+  try {
+    await post('/auth/setup', { username: sf.username.value.trim(), password: sf.password.value });
+    location.replace(BASE);
+  } catch (err) { $('setupErr').textContent = err.message; checkRules(); }
+});
+
+/* ---- sign in ---- */
+const lf = $('loginForm');
+lf.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('loginErr').textContent = '';
+  const btn = lf.querySelector('button.primary');
+  btn.disabled = true;
+  try {
+    await post('/auth/login', { username: lf.username.value.trim(), password: lf.password.value });
+    location.replace(BASE);
+  } catch (err) {
+    $('loginErr').textContent = err.message;
+    lf.password.value = '';
+    lf.password.focus();
+  }
+  btn.disabled = false;
+});
+
+(async () => {
+  let st = { setup_needed: false, setup_allowed: true };
+  try { st = await (await fetch(BASE + '/auth/state', { credentials: 'same-origin' })).json(); } catch {}
+  if (st.signed_in) { location.replace(BASE); return; }
+  if (st.setup_needed) {
+    $(st.setup_allowed ? 'setup' : 'blocked').hidden = false;
+    if (st.setup_allowed) sf.username.focus();
+  } else {
+    $('login').hidden = false;
+    lf.username.focus();
+  }
+})();
+</script>
+</body>
+</html>

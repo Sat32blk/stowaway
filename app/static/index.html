@@ -1,0 +1,1844 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stowaway</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f5f6f8; --surface: #ffffff; --line: #e3e6ec; --fg: #1b2130; --muted: #687085;
+  --accent: #2f6fed; --accent-fg: #fff; --accent-soft: #e8effd;
+  --ok: #1f9d61; --ok-bg: #e4f5ec; --warn: #b7791f; --warn-bg: #fdf2dc;
+  --off: #7b8397; --off-bg: #eef0f4; --bad: #d14343; --bad-bg: #fbe7e7;
+  --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #11141a; --surface: #191d25; --line: #2a303b; --fg: #e5e8ee; --muted: #8b93a5;
+    --accent: #6b98ff; --accent-fg: #0d1220; --accent-soft: #1d2740;
+    --ok: #4cc98c; --ok-bg: #173226; --warn: #e3b04b; --warn-bg: #352a14;
+    --off: #8b93a5; --off-bg: #232833; --bad: #f07272; --bad-bg: #3a1c1c;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.wrap { max-width: 1000px; margin: 0 auto; padding: 28px 16px 60px; }
+header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 26px; }
+header h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+header .sum { color: var(--muted); font-size: 14px; }
+.spacer { flex: 1; }
+.demo { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--warn-bg); color: var(--warn); }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0; font-weight: 650; }
+.sechead { display: flex; align-items: center; gap: 12px; margin: 30px 0 12px; flex-wrap: wrap; }
+.sechead:first-of-type { margin-top: 0; }
+button, a.btn { font: inherit; font-size: 14px; border-radius: 8px; padding: 7px 14px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg); text-decoration: none; display: inline-block; }
+button:hover:not(:disabled), a.btn:hover { border-color: var(--muted); }
+button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 600; }
+button.danger { color: var(--bad); }
+input[type=search] { max-width: 240px; }
+
+/* controlled cards */
+.list { display: grid; gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 16px 18px; display: grid; grid-template-columns: minmax(0, 1fr) 250px auto; gap: 16px; align-items: center; }
+.name { font-weight: 650; font-size: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.meta { color: var(--muted); font-size: 13px; margin-top: 2px; word-break: break-word; }
+.meta a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.meta a:hover { text-decoration: underline; }
+.pill { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 99px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.running { background: var(--ok-bg); color: var(--ok); }
+.pill.starting, .pill.stopping { background: var(--warn-bg); color: var(--warn); }
+.pill.updating { background: color-mix(in srgb, #8b5cf6 16%, transparent); color: #8b5cf6; }
+.pill.updating::before { animation: blink 1s ease-in-out infinite; }
+.tag.ready { background: color-mix(in srgb, #8b5cf6 16%, transparent); color: #8b5cf6; }
+.pill.starting::before, .pill.stopping::before { animation: blink 1s ease-in-out infinite; }
+.pill.stopped, .pill.sleeping { background: var(--off-bg); color: var(--off); }
+.pill.missing { background: var(--bad-bg); color: var(--bad); }
+@keyframes blink { 50% { opacity: .25; } }
+.idle .label { font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.idle .label b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.bar { height: 6px; border-radius: 99px; background: var(--off-bg); margin-top: 6px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--ok); border-radius: 99px; transition: width 1s linear; }
+.bar.low > i { background: var(--warn); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.warn { grid-column: 1 / -1; font-size: 13px; color: var(--warn); background: var(--warn-bg); padding: 6px 10px; border-radius: 8px; }
+.warn button { font-size: 13px; padding: 2px 10px; margin-left: 8px; }
+.tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: var(--off-bg); color: var(--muted); margin-left: 6px; white-space: nowrap; }
+.err { grid-column: 1 / -1; font-size: 13px; color: var(--bad); background: var(--bad-bg); padding: 6px 10px; border-radius: 8px; }
+.empty { text-align: center; padding: 32px 16px; color: var(--muted); background: var(--surface);
+  border: 1px dashed var(--line); border-radius: var(--radius); }
+
+/* all containers */
+.table { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.crow { display: grid; grid-template-columns: 220px 1fr 150px 90px; gap: 14px; align-items: center;
+  padding: 12px 16px; border-top: 1px solid var(--line); }
+.crow:first-child { border-top: 0; }
+.crow.on { background: var(--accent-soft); }
+.crow .cname { font-weight: 600; overflow-wrap: anywhere; }
+.crow .sub { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; user-select: none; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; margin: 0; }
+.check.dis { opacity: .5; cursor: default; }
+.ports { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* dialogs */
+dialog { border: 1px solid var(--line); border-radius: 14px; padding: 0; background: var(--surface); color: var(--fg);
+  width: min(480px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgb(0 0 0 / .45); }
+form { padding: 22px; display: grid; gap: 14px; }
+form h2 { font-size: 18px; text-transform: none; letter-spacing: 0; color: var(--fg); }
+label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; }
+label small, .hint { font-weight: 400; color: var(--muted); font-size: 13px; }
+.hint { margin: -6px 0 0; }
+.hint b { color: var(--fg); }
+input, textarea { font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--fg); width: 100%; }
+textarea { resize: vertical; min-height: 70px; }
+input, textarea, select { font-weight: 400; }
+select { font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--fg); width: 100%; font-weight: 400; }
+.section { border-top: 1px solid var(--line); padding-top: 14px; display: grid; gap: 12px; }
+.section h3 { margin: 0; font-size: 14px; }
+form h2 + .section { border-top: 0; padding-top: 0; }
+.inline { display: flex; gap: 8px; flex-wrap: wrap; }
+.inline button { font-size: 13px; padding: 5px 12px; }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: .6; }
+input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+details { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+details summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); }
+details[open] summary { margin-bottom: 10px; }
+details > label + label { margin-top: 12px; }
+details > p + label { margin-top: 12px; }
+.mvbox { border-top: 1px solid var(--line); padding-top: 14px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.formbar { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+.formerr { color: var(--bad); font-size: 13px; min-height: 1em; }
+code { font-size: 12px; background: var(--bg); padding: 1px 5px; border-radius: 5px; }
+
+
+/* ===== Modern theme: aurora background, dot grid, glass surfaces ===== */
+:root {
+  --bg: #eef1f7;
+  --glass: rgb(255 255 255 / .7); --glass-strong: rgb(255 255 255 / .88); --glass-line: rgb(255 255 255 / .75);
+  --field: rgb(255 255 255 / .7);
+  --shadow: 0 1px 2px rgb(16 24 40 / .04), 0 10px 30px rgb(16 24 40 / .07);
+  --grad: linear-gradient(135deg, #4f7bff 0%, #8b5cf6 55%, #ec4899 100%);
+  --blob1: #7aa2ff; --blob2: #c4a1ff; --blob3: #6ee7d8; --blob4: #fbb6dc; --blob-op: .55;
+  --dot: rgb(30 40 70 / .09);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #090c12;
+    --glass: rgb(22 26 36 / .58); --glass-strong: rgb(20 24 33 / .9); --glass-line: rgb(255 255 255 / .08);
+    --field: rgb(10 13 19 / .55);
+    --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 12px 34px rgb(0 0 0 / .35);
+    --blob1: #2f5bff; --blob2: #7c3aed; --blob3: #0d9488; --blob4: #be185d; --blob-op: .32;
+    --dot: rgb(255 255 255 / .055);
+  }
+}
+body { background: var(--bg); min-height: 100vh; }
+.bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.bg i { position: absolute; width: 55vmax; height: 55vmax; border-radius: 50%; filter: blur(90px);
+  opacity: var(--blob-op); animation: drift 40s ease-in-out infinite alternate; will-change: transform; }
+.bg i:nth-child(1) { background: var(--blob1); top: -22vmax; left: -12vmax; }
+.bg i:nth-child(2) { background: var(--blob2); top: -14vmax; right: -22vmax; animation-duration: 48s; animation-delay: -12s; }
+.bg i:nth-child(3) { background: var(--blob3); bottom: -28vmax; left: 8vmax; animation-duration: 54s; animation-delay: -24s; }
+.bg i:nth-child(4) { background: var(--blob4); bottom: -22vmax; right: -12vmax; width: 42vmax; height: 42vmax; animation-duration: 44s; animation-delay: -6s; }
+.bg::after { content: ""; position: absolute; inset: 0;
+  background-image: radial-gradient(var(--dot) 1px, transparent 1.3px); background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 20%, #000 35%, transparent 85%);
+          mask-image: radial-gradient(ellipse 80% 70% at 50% 20%, #000 35%, transparent 85%); }
+@keyframes drift {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(7vmax, 5vmax) scale(1.12); }
+  100% { transform: translate(-5vmax, 7vmax) scale(.94); }
+}
+@media (prefers-reduced-motion: reduce) { .bg i { animation: none; } }
+
+.card, .table, .empty {
+  background: var(--glass); border-color: var(--glass-line); box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
+}
+.card, .table { border-radius: 16px; }
+.card { transition: transform .2s ease, box-shadow .2s ease; }
+.card:hover { transform: translateY(-1px); box-shadow: var(--shadow), 0 16px 40px rgb(79 123 255 / .10); }
+.empty { border-style: dashed; border-color: color-mix(in srgb, var(--muted) 35%, transparent); }
+dialog { background: var(--glass-strong); border-color: var(--glass-line); border-radius: 18px; box-shadow: 0 30px 80px rgb(0 0 0 / .25);
+  -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%); }
+dialog::backdrop { background: rgb(8 10 20 / .35); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+
+button, a.btn { background: var(--glass-strong); border-color: color-mix(in srgb, var(--muted) 22%, transparent);
+  border-radius: 10px; transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+button:hover:not(:disabled), a.btn:hover { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+button:active:not(:disabled), a.btn:active { transform: translateY(1px); }
+button.primary { background: var(--grad); border-color: transparent; color: #fff;
+  box-shadow: 0 6px 18px rgb(99 102 241 / .35); }
+button.primary:hover:not(:disabled) { border-color: transparent; box-shadow: 0 8px 24px rgb(99 102 241 / .45); }
+
+input, textarea, select { background: var(--field); border-color: color-mix(in srgb, var(--muted) 25%, transparent); border-radius: 10px; }
+input:focus, textarea:focus, select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); }
+details { border-color: color-mix(in srgb, var(--muted) 22%, transparent); border-radius: 10px; }
+.crow { border-color: color-mix(in srgb, var(--muted) 16%, transparent); }
+.crow.on { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.crow:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.crow.on:hover { background: color-mix(in srgb, var(--accent) 13%, transparent); }
+.bar { background: color-mix(in srgb, var(--muted) 18%, transparent); }
+.bar > i { background: linear-gradient(90deg, #22c55e, #14b8a6); }
+.bar.low > i { background: linear-gradient(90deg, #f59e0b, #f97316); }
+
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo { width: 38px; height: 38px; border-radius: 12px; background: var(--grad); display: grid; place-items: center;
+  box-shadow: 0 6px 18px rgb(99 102 241 / .35), inset 0 1px 0 rgb(255 255 255 / .35); flex: none; }
+.logo svg { width: 20px; height: 20px; }
+header h1 { font-size: 24px; letter-spacing: -0.02em; }
+header h1 span { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+h2 { display: flex; align-items: center; gap: 8px; }
+h2::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--grad); }
+form h2::before { display: none; }
+
+/* activity, keep awake, awake hours */
+.idle .label > span:first-child, .idle .label .state { white-space: nowrap; }
+.idle .label b { text-align: right; }
+.stats { display: flex; gap: 12px; margin-top: 8px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stats b { color: var(--fg); font-weight: 600; }
+.bar.full > i { width: 100%; }
+.bar.busy > i { background: linear-gradient(90deg, #8b5cf6, #ec4899); animation: flow 1.6s linear infinite; background-size: 200% 100%; }
+.bar.held > i { background: var(--grad); }
+@keyframes flow { to { background-position: -200% 0; } }
+.label .state { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--fg); }
+.label .state svg { width: 14px; height: 14px; }
+.menu { position: fixed; z-index: 50; min-width: 190px; padding: 6px; border-radius: 12px; background: var(--glass-strong);
+  border: 1px solid var(--glass-line); box-shadow: 0 18px 50px rgb(0 0 0 / .22);
+  -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); }
+.menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 12px; border-radius: 8px; }
+.menu button:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.menu .mh { font-size: 12px; color: var(--muted); padding: 6px 12px 4px; }
+.certbox { font-size: 13px; line-height: 1.55; padding: 10px 12px; border-radius: 10px;
+  background: color-mix(in srgb, var(--muted) 10%, transparent); overflow-wrap: anywhere; }
+.certbox:empty { display: none; }
+.certbox .ok { color: var(--ok); font-weight: 600; }
+.certbox .bad { color: var(--bad); font-weight: 600; }
+.certbox .warnc { color: var(--warn); font-weight: 600; }
+.certbox a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.certbox pre { white-space: pre-wrap; font-size: 11px; max-height: 180px; overflow: auto; margin: 8px 0 0; }
+.certbox summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 6px; }
+.sub { display: grid; gap: 12px; }
+.lock { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin-right: 3px; }
+.who { font-size: 13px; color: var(--muted); }
+.who b { color: var(--fg); font-weight: 600; }
+.banner { margin: -8px 0 22px; padding: 10px 14px; border-radius: 12px; font-size: 14px;
+  background: var(--warn-bg); color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent); }
+.banner code { background: transparent; font-weight: 600; }
+.rules { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 13px; color: var(--muted); }
+.rules li { display: flex; align-items: center; gap: 7px; }
+.rules li::before { content: ""; width: 13px; height: 13px; border-radius: 50%; flex: none; border: 1.5px solid color-mix(in srgb, var(--muted) 60%, transparent); }
+.rules li.ok { color: var(--ok); }
+.rules li.ok::before { border-color: var(--ok); background: var(--ok); box-shadow: inset 0 0 0 2.5px var(--glass-strong); }
+#acctMsg.ok { color: var(--ok); }
+#savings { margin-bottom: 8px; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile { background: var(--glass); border: 1px solid var(--glass-line); border-radius: 16px; padding: 16px 18px;
+  box-shadow: var(--shadow); -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.t-label { font-size: 13px; color: var(--muted); font-weight: 600; }
+.t-value { font-size: 30px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.15; color: var(--fg); }
+.t-value small { font-size: 16px; font-weight: 600; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
+.t-sub { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.meter { height: 6px; border-radius: 99px; margin: 6px 0 2px; overflow: hidden;
+  background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.meter i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--accent); transition: width .6s ease; }
+.savings-note { margin: 10px 2px 22px; font-size: 12px; }
+.seg { display: inline-flex; padding: 3px; border-radius: 10px; gap: 2px;
+  background: color-mix(in srgb, var(--muted) 14%, transparent); }
+.seg button { border: 0; background: transparent; font-size: 13px; padding: 4px 12px; border-radius: 8px; color: var(--muted); box-shadow: none; }
+.seg button[aria-selected="true"] { background: var(--glass-strong); color: var(--fg); font-weight: 600; box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+@media (max-width: 860px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .t-value { font-size: 26px; } }
+.checkline { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+.checkline input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.hrow { display: grid; gap: 8px; padding: 10px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--muted) 20%, transparent); }
+.hrow + .hrow { margin-top: 8px; }
+.days { display: flex; gap: 4px; flex-wrap: wrap; }
+.day { width: 38px; padding: 5px 0; font-size: 12px; font-weight: 600; text-align: center; border-radius: 8px; }
+.day.on { background: var(--grad); color: #fff; border-color: transparent; }
+.times { display: flex; align-items: center; gap: 8px; }
+.times input { width: auto; flex: 1; min-width: 0; }
+.times span { color: var(--muted); font-size: 13px; }
+.times .rm { padding: 5px 10px; }
+.card .actions button, .card .actions a.btn { padding: 7px 12px; }
+
+/* tabs + maintenance */
+.tabs { display: flex; gap: 4px; padding: 4px; border-radius: 14px; width: fit-content; margin: -6px 0 22px;
+  background: color-mix(in srgb, var(--muted) 14%, transparent); }
+.tabs button { border: 0; background: transparent; box-shadow: none; padding: 7px 18px; border-radius: 10px;
+  color: var(--muted); font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+.tabs button svg { width: 16px; height: 16px; }
+.tabs button[aria-selected="true"] { background: var(--glass-strong); color: var(--fg); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+.tabs .count { font-size: 11px; padding: 0 7px; border-radius: 99px; background: var(--grad); color: #fff; line-height: 18px; }
+.mrow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1.4fr) 170px; gap: 16px; align-items: center;
+  padding: 14px 16px; border-top: 1px solid color-mix(in srgb, var(--muted) 16%, transparent); }
+.mrow:first-child { border-top: 0; }
+.mrow.on { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.mrow .cname { font-weight: 600; overflow-wrap: anywhere; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mrow .sub { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.mrow .sched { font-size: 14px; font-weight: 600; }
+.mrow .sched.off { color: var(--muted); font-weight: 400; }
+.mrow .last { font-size: 13px; color: var(--muted); display: grid; gap: 3px; min-width: 0; }
+.mrow .last .msg { overflow-wrap: anywhere; }
+.mrow .actions { justify-content: flex-end; }
+.mrow .actions button { padding: 6px 12px; font-size: 13px; }
+.linkbtn { border: 0; background: none; box-shadow: none; padding: 0; color: var(--accent); font-size: 13px; font-weight: 600; width: fit-content; }
+.linkbtn:hover:not(:disabled) { text-decoration: underline; }
+.res { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 99px; width: fit-content; white-space: nowrap; }
+.res.ok { background: var(--ok-bg); color: var(--ok); }
+.res.updated { background: color-mix(in srgb, #8b5cf6 16%, transparent); color: #8b5cf6; }
+.res.skipped, .res.missed { background: var(--off-bg); color: var(--off); }
+.res.rolled_back, .res.waiting { background: var(--warn-bg); color: var(--warn); }
+.res.failed { background: var(--bad-bg); color: var(--bad); }
+.pill.maintenance { background: color-mix(in srgb, #0ea5e9 16%, transparent); color: #0ea5e9; }
+.pill.maintenance::before { animation: blink 1s ease-in-out infinite; }
+.mprog { display: grid; gap: 4px; font-size: 13px; }
+.mprog .bar { margin-top: 0; }
+.mintro { margin: 0 0 14px; font-size: 14px; color: var(--muted); max-width: 760px; }
+.mintro b { color: var(--fg); }
+@media (max-width: 760px) {
+  .mrow { grid-template-columns: 1fr; gap: 8px; }
+  .mrow .actions { justify-content: flex-start; }
+}
+
+/* integrations */
+#intDlg { width: min(720px, calc(100vw - 32px)); }
+.tabs.small { margin: 0; flex-wrap: wrap; }
+.tabs.small button { padding: 5px 12px; font-size: 13px; }
+pre.snip { margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 12px; line-height: 1.5; overflow: auto; max-height: 340px;
+  background: color-mix(in srgb, var(--muted) 12%, transparent); white-space: pre; tab-size: 2; }
+.snipbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.steps { margin: 0; padding-left: 20px; font-size: 14px; display: grid; gap: 6px; }
+.steps code, .hint code { word-break: break-all; }
+.tok { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; font-size: 13px;
+  border: 1px solid color-mix(in srgb, var(--muted) 20%, transparent); }
+.tok + .tok { margin-top: 6px; }
+.tok b { font-weight: 600; }
+.tok .sub { color: var(--muted); flex: 1; }
+.newtok { padding: 10px 12px; border-radius: 10px; background: var(--ok-bg); color: var(--ok); font-size: 13px; display: grid; gap: 6px; }
+.newtok code { font-size: 13px; background: transparent; color: var(--fg); user-select: all; word-break: break-all; }
+
+@media (max-width: 760px) {
+  .card { grid-template-columns: 1fr; gap: 12px; }
+  .crow { grid-template-columns: 1fr auto; }
+  .crow .ports { grid-column: 1; }
+  .crow .check { grid-column: 1 / -1; order: 5; }
+  .row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<div class="wrap">
+  <header>
+    <div class="brand"><div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 7.2a8 8 0 1 0 11.4 0"/></svg></div><h1>Stow<span>away</span></h1></div>
+    <span class="sum" id="sum"></span>
+    <span class="demo" id="demo" hidden>demo mode</span>
+    <span class="spacer"></span>
+    <span class="who" id="who" hidden></span>
+    <button id="intBtn">Integrations</button>
+    <button id="settingsBtn">Settings</button>
+    <button id="signOut" hidden>Sign out</button>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" data-tab="apps" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Sleep &amp; wake</button>
+    <button type="button" role="tab" data-tab="maint" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>Maintenance <span class="count" id="mCount" hidden></span></button>
+  </nav>
+
+  <div id="tab-apps">
+  <section id="savings" hidden>
+    <div class="sechead">
+      <h2>Resources saved</h2>
+      <span class="spacer"></span>
+      <div class="seg" role="tablist" aria-label="Period">
+        <button type="button" role="tab" data-p="week" aria-selected="true">7 days</button>
+        <button type="button" role="tab" data-p="total" aria-selected="false">All time</button>
+      </div>
+    </div>
+    <div class="tiles">
+      <div class="tile">
+        <div class="t-label">Memory freed now</div>
+        <div class="t-value" id="sv-mem">–</div>
+        <div class="meter" aria-hidden="true"><i id="sv-mem-bar"></i></div>
+        <div class="t-sub" id="sv-mem-sub"></div>
+      </div>
+      <div class="tile">
+        <div class="t-label">CPU freed now</div>
+        <div class="t-value" id="sv-cpu">–</div>
+        <div class="meter" aria-hidden="true"><i id="sv-cpu-bar"></i></div>
+        <div class="t-sub" id="sv-cpu-sub"></div>
+      </div>
+      <div class="tile">
+        <div class="t-label">CPU time saved</div>
+        <div class="t-value" id="sv-cput">–</div>
+        <div class="t-sub" id="sv-cput-sub"></div>
+      </div>
+      <div class="tile">
+        <div class="t-label">Average memory freed</div>
+        <div class="t-value" id="sv-avg">–</div>
+        <div class="t-sub" id="sv-avg-sub"></div>
+      </div>
+    </div>
+    <p class="hint savings-note" id="sv-note"></p>
+  </section>
+
+  <div class="sechead"><h2>Controlled by Stowaway</h2></div>
+  <div class="list" id="list"></div>
+
+  <div class="sechead">
+    <h2>Containers on this server</h2>
+    <span class="spacer"></span>
+    <input type="search" id="filter" placeholder="Filter containers">
+  </div>
+  <div class="table" id="containers"></div>
+  </div>
+
+  <div id="tab-maint" hidden>
+    <p class="mintro">Restart containers on a schedule, and optionally update them to the newest version at the same time. This works for <b>any container</b>, including ones Stowaway doesn't put to sleep. If a container is busy at its scheduled time, Stowaway waits for it to calm down. If a new version won't start, the previous one is put back.</p>
+    <div class="sechead">
+      <h2>Scheduled restarts</h2>
+      <span class="spacer"></span>
+      <span class="hint" id="mTz" style="margin:0"></span>
+      <input type="search" id="mFilter" placeholder="Filter containers">
+    </div>
+    <div class="table" id="mList"></div>
+  </div>
+</div>
+
+<dialog id="mDlg">
+  <form id="mForm" method="dialog">
+    <h2 id="mTitle"></h2>
+    <label>Restart
+      <select name="freq">
+        <option value="off">Never (off)</option>
+        <option value="daily">Every day</option>
+        <option value="weekly">Every week</option>
+        <option value="monthly">Every month</option>
+      </select></label>
+    <div class="row" id="mWhen">
+      <label id="mWeekday">Day
+        <select name="weekday">
+          <option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option>
+          <option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option>
+          <option value="6">Sunday</option>
+        </select></label>
+      <label id="mMday">Day of the month
+        <select name="mday"></select></label>
+      <label>Time
+        <input name="time" type="time" required value="04:00"></label>
+    </div>
+    <div class="section" id="mOpts">
+      <label class="checkline"><input type="checkbox" name="update"> Also update to the newest version</label>
+      <p class="hint" id="mUpdHint" style="margin:0"></p>
+      <label>If it's busy, wait up to <small>hours; 0 = restart anyway</small>
+        <input name="busy_wait" type="number" min="0" max="24" step="0.5" value="6"></label>
+      <p class="hint" id="mBusyHint" style="margin:0"></p>
+    </div>
+    <p class="hint" id="mNext" style="margin:0"></p>
+    <div class="formerr" id="mErr"></div>
+    <div class="formbar"><span class="spacer"></span>
+      <button type="button" id="mCancel">Cancel</button>
+      <button type="submit" class="primary">Save</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg">
+  <form id="form" method="dialog">
+    <h2 id="dlgTitle"></h2>
+    <label>Link port
+      <input name="link_port" type="number" min="1" max="65535" required></label>
+    <p class="hint" id="linkHint"></p>
+    <div class="row">
+      <label>App port <small>inside the container</small>
+        <input name="port" type="number" min="1" max="65535" list="portList" required></label>
+      <label>Stop after idle <small>minutes, 0 = never</small>
+        <input name="idle" type="number" min="0" step="1" value="10"></label>
+    </div>
+    <datalist id="portList"></datalist>
+    <p class="hint" id="portHint"></p>
+    <div class="section">
+      <h3>Stay awake while busy</h3>
+      <label class="checkline"><input type="checkbox" name="busy_check"> Don't put it to sleep while it's busy</label>
+      <div class="row" id="busyRow">
+        <label>CPU above <small>percent, 100 = one core</small>
+          <input name="busy_cpu" type="number" min="0" step="0.5"></label>
+        <label>Network above <small>KB per second</small>
+          <input name="busy_net" type="number" min="0" step="1"></label>
+      </div>
+      <p class="hint" id="busyHint" style="margin:0"></p>
+    </div>
+    <div class="section">
+      <h3>Awake hours</h3>
+      <p class="hint" id="hoursHint" style="margin:0"></p>
+      <div id="hours"></div>
+      <div><button type="button" id="addHours">Add awake hours</button></div>
+    </div>
+    <div class="section">
+      <h3>Updates</h3>
+      <label class="checkline"><input type="checkbox" name="upd_on"> Check for a newer version when waking</label>
+      <label id="updEveryWrap">Check at most every <small>hours; 0 = every time it wakes</small>
+        <input name="upd_every" type="number" min="0" max="720" step="1"></label>
+      <p class="hint" id="updHint" style="margin:0"></p>
+      <div class="inline" id="updBtns"><button type="button" id="updCheck">Check now</button></div>
+    </div>
+    <details>
+      <summary>Advanced</summary>
+      <label>When opened
+        <select name="open_mode">
+          <option value="proxy">Stay on Stowaway's address (recommended)</option>
+          <option value="direct">Go to the app's own address</option>
+        </select></label>
+      <p class="hint" id="openHint" style="margin:6px 0 0"></p>
+      <label>Hostnames <small>optional, comma separated, if you use local DNS</small>
+        <input name="hosts" placeholder="jellyfin.home.lan"></label>
+      <label>Start page <small>overrides the style in Settings for this app</small>
+        <select name="style">
+          <option value="">Use default from Settings</option>
+          <option value="please_wait">Please Wait</option>
+          <option value="starting_service">Starting Service</option>
+          <option value="loading_name">Loading %name%</option>
+          <option value="countdown">Ready in 3, 2, 1</option>
+          <option value="custom">Custom message</option>
+        </select></label>
+      <label>Ready delay <small>seconds; leave empty to use the default</small>
+        <input name="delay" type="number" min="0" max="300" step="0.5" placeholder="default"></label>
+      <label>Upstream URL <small>only if the app can't be found automatically</small>
+        <input name="upstream" placeholder="http://192.168.1.2:8096"></label>
+    </details>
+    <div class="formerr" id="formErr"></div>
+    <div class="formbar">
+      <button type="button" class="danger" id="release" hidden>Disable Stowaway</button>
+      <span class="spacer"></span>
+      <button type="button" id="cancel">Cancel</button>
+      <button type="submit" class="primary" id="saveBtn">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="setDlg">
+  <form id="setForm" method="dialog">
+    <h2>Settings</h2>
+    <div class="section">
+      <h3>Start page</h3>
+      <p class="hint" style="margin:0">What visitors see while a sleeping app starts up. If it fails to start, they see an error page with a Try again button.</p>
+      <label>Style
+        <select name="style">
+          <option value="please_wait">Please Wait</option>
+          <option value="starting_service">Starting Service</option>
+          <option value="loading_name">Loading %name%</option>
+          <option value="countdown">Ready in 3, 2, 1</option>
+          <option value="custom">Custom message</option>
+        </select></label>
+      <label id="customWrap">Custom message <small><code>%name%</code> is replaced with the app's name</small>
+        <input name="custom" maxlength="200" placeholder="Hang tight, %name% is on its way"></label>
+      <label>Ready delay <small>seconds to wait after the app is up before opening it</small>
+        <input name="delay" type="number" min="0" max="300" step="0.5" value="0"></label>
+      <div class="inline">
+        <button type="button" id="prevStart">Preview start page</button>
+        <button type="button" id="prevUpdate">Preview update page</button>
+        <button type="button" id="prevError">Preview error page</button>
+      </div>
+    </div>
+    <div class="section">
+      <h3>Busy detection and awake hours</h3>
+      <p class="hint" style="margin:0">An app counts as busy, and isn't put to sleep, while its CPU or network use is above these. Each app can override them in Edit.</p>
+      <div class="row">
+        <label>CPU above <small>percent, 100 = one core</small>
+          <input name="bcpu" type="number" min="0" step="0.5"></label>
+        <label>Network above <small>KB per second</small>
+          <input name="bnet" type="number" min="0" step="1"></label>
+      </div>
+      <label>Time zone <small>used for awake hours</small>
+        <input name="tz" list="tzList" placeholder="America/New_York" autocomplete="off"></label>
+      <datalist id="tzList"></datalist>
+      <p class="hint" id="tzHint" style="margin:0"></p>
+    </div>
+    <div class="section">
+      <h3>HTTPS</h3>
+      <label class="checkline"><input type="checkbox" name="https_on"> Serve apps over HTTPS</label>
+      <div class="sub" id="httpsFields">
+        <div class="row">
+          <label>Domain <small>each app becomes <i>name</i>.domain</small>
+            <input name="https_domain" placeholder="myhome.duckdns.org" autocomplete="off" spellcheck="false"></label>
+          <label>HTTPS port <small>443 leaves the port out of links</small>
+            <input name="https_port" type="number" min="1" max="65535"></label>
+        </div>
+        <label>Certificate
+          <select name="cert_source">
+            <option value="selfsigned">Self-signed (works right away, browsers warn)</option>
+            <option value="duckdns">Let's Encrypt with DuckDNS (free)</option>
+            <option value="cloudflare">Let's Encrypt with Cloudflare</option>
+            <option value="http">Let's Encrypt with port 80 forwarded</option>
+            <option value="custom">My own certificate files</option>
+          </select></label>
+        <p class="hint" id="certHelp" style="margin:0"></p>
+        <label data-src="duckdns">DuckDNS token <small>shown at the top of duckdns.org after you sign in</small>
+          <input name="duckdns_token" type="password" autocomplete="off"></label>
+        <label data-src="cloudflare">Cloudflare API token <small>needs Zone → DNS → Edit for this domain</small>
+          <input name="cloudflare_token" type="password" autocomplete="off"></label>
+        <label data-src="http">HTTP check port <small>your router forwards internet port 80 to this port</small>
+          <input name="http_challenge_port" type="number" min="1" max="65535"></label>
+        <label data-src="le">Email <small>optional; Let's Encrypt only writes if renewal keeps failing</small>
+          <input name="le_email" type="email" autocomplete="off"></label>
+        <label class="checkline" data-src="le" style="font-weight:400"><input type="checkbox" name="le_staging"> Test certificates (not trusted by browsers, but no rate limits while you experiment)</label>
+        <div class="certbox" id="certStatus"></div>
+        <div class="inline"><button type="button" id="certBtn">Save and get certificate</button></div>
+      </div>
+      <label class="checkline"><input type="checkbox" name="lan_only"> Only allow this dashboard from my home network</label>
+      <p class="hint" id="lanHint" style="margin:0"></p>
+    </div>
+    <div class="section">
+      <h3>Dashboard status checks</h3>
+      <p class="hint" style="margin:0">Requests matching these are treated as status checks from Heimdall, Homarr and similar: they never wake a sleeping container and never reset its idle timer.</p>
+      <label>Ignore user agents <small>one per line; matches if the text appears anywhere</small>
+        <textarea name="uas" placeholder="Homarr"></textarea></label>
+      <label>Ignore IP addresses <small>one per line; single IPs or ranges like 172.18.0.0/16</small>
+        <textarea name="ips" placeholder="192.168.1.60"></textarea></label>
+      <p class="hint" style="margin:0">A tile's status URL can also be <code id="statusEx"></code>, which always answers without waking anything.</p>
+        </div>
+    <div class="section">
+      <h3>Macvlan</h3>
+      <label>Macvlan helper IP <small>only needed if you control containers on macvlan networks</small>
+        <input name="shim" placeholder="192.168.1.250" inputmode="decimal"></label>
+      <p class="hint" id="mvHint" style="margin:6px 0 0"></p>
+    </div>
+    <div class="section" id="diagSection">
+      <h3>Diagnostics</h3>
+      <p class="hint" style="margin:0">If something isn't working, a diagnostic report helps find out why. It's only shown or downloaded here: nothing is sent anywhere unless you attach it to a problem report yourself. Passwords, tokens and API keys are always removed.</p>
+      <label class="checkline"><input type="checkbox" name="diag_debug"> Detailed logging</label>
+      <p class="hint" id="diagDebugHint" style="margin:0"></p>
+      <label class="checkline" style="font-weight:400"><input type="checkbox" name="diag_private" checked> Hide my domain, email, username and public IP address in the report</label>
+      <div class="certbox" id="diagProblems"></div>
+      <div class="inline">
+        <button type="button" id="diagView">View report</button>
+        <button type="button" id="diagDownload">Download report</button>
+        <button type="button" id="diagIssue">Report a problem on GitHub</button>
+      </div>
+      <p class="hint" id="diagVersion" style="margin:0"></p>
+    </div>
+    <div class="section" id="accountSection">
+      <h3>Account</h3>
+      <p class="hint" style="margin:0">Change the username or password you sign in with. Changing the password signs out your other devices.</p>
+      <label>Username
+        <input name="acct_user" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="32"></label>
+      <div class="row">
+        <label>New password <small>leave empty to keep</small>
+          <input name="acct_new" type="password" autocomplete="new-password" maxlength="128"></label>
+        <label>Confirm new password <small>type it again</small>
+          <input name="acct_confirm" type="password" autocomplete="new-password" maxlength="128"></label>
+      </div>
+      <ul class="rules" id="acctRules" hidden>
+        <li data-r="len">8 or more characters</li><li data-r="letter">A letter</li>
+        <li data-r="number">A number</li><li data-r="special">A special character</li>
+        <li data-r="match">Passwords match</li>
+      </ul>
+      <label>Current password <small>needed for any change here</small>
+        <input name="acct_current" type="password" autocomplete="current-password" maxlength="128"></label>
+      <div class="formerr" id="acctMsg"></div>
+      <div class="inline"><button type="button" id="acctBtn">Update account</button></div>
+    </div>
+<div class="formerr" id="setErr"></div>
+    <div class="formbar"><span class="spacer"></span>
+      <button type="button" id="setCancel">Cancel</button>
+      <button type="submit" class="primary">Save</button></div>
+  </form>
+</dialog>
+
+
+<dialog id="intDlg">
+  <form id="intForm" method="dialog">
+    <h2>Dashboards &amp; Home Assistant</h2>
+    <p class="hint" style="margin:0">Show whether apps are awake, and when they restart next, on your dashboard tiles. Or control them from Home Assistant. Status addresses never wake an app.</p>
+    <label>App
+      <select name="app" id="intApp"></select></label>
+    <nav class="tabs small" role="tablist" id="intTabs">
+      <button type="button" data-t="homarr" aria-selected="true">Homarr</button>
+      <button type="button" data-t="homepage" aria-selected="false">Homepage</button>
+      <button type="button" data-t="dashy" aria-selected="false">Dashy</button>
+      <button type="button" data-t="glance" aria-selected="false">Glance</button>
+      <button type="button" data-t="heimdall" aria-selected="false">Heimdall</button>
+      <button type="button" data-t="ha" aria-selected="false">Home Assistant</button>
+      <button type="button" data-t="urls" aria-selected="false">Addresses</button>
+    </nav>
+    <div id="intBody" style="display:grid;gap:12px"></div>
+    <div class="section" id="tokSection" hidden>
+      <h3>API tokens</h3>
+      <p class="hint" style="margin:0">Home Assistant and scripts use a token instead of your password. A token can see and control apps (wake, sleep, keep awake, switch off, restart) but can't change settings or your account. It only works from your home network unless you allow the dashboard from outside.</p>
+      <div id="tokList"></div>
+      <div id="tokNew"></div>
+      <div class="inline"><input name="tokname" placeholder="Name, e.g. Home Assistant" maxlength="60" style="flex:1;min-width:180px">
+        <button type="button" id="tokCreate">Create token</button></div>
+    </div>
+    <div class="formerr" id="intErr"></div>
+    <div class="formbar"><span class="spacer"></span><button type="button" id="intClose">Close</button></div>
+  </form>
+</dialog>
+<div class="menu" id="menu" hidden>
+  <div class="mh">Keep awake for</div>
+  <button data-hold="60">1 hour</button>
+  <button data-hold="240">4 hours</button>
+  <button data-hold="720">12 hours</button>
+  <button data-hold="forever">Until I release it</button>
+  <div class="mh" style="border-top:1px solid var(--line);margin-top:4px;padding-top:8px">Or</div>
+  <button data-hold="off">Sleep, and don't wake until I allow it</button>
+</div>
+
+<script>
+const API = location.pathname.replace(/\/$/, '') + '/api';
+let services = [], containers = [], offset = 0, editing = null, adding = null;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const host = location.hostname;
+
+async function api(path, opts = {}) {
+  const r = await fetch(API + path, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Stowaway': '1' }, ...opts });
+  if (r.status === 401 && path !== '/account') {
+    location.replace(location.pathname);     // session ended: show the sign-in page
+    throw new Error('Please sign in.');
+  }
+  if (!r.ok) {
+    let msg = r.statusText;
+    try { const d = await r.json(); msg = d.detail || msg; } catch {}
+    throw new Error(msg);
+  }
+  return r.status === 204 ? null : r.json();
+}
+
+function fmtDur(s) {
+  s = Math.max(0, Math.round(s));
+  if (s < 60) return s + 's';
+  const m = Math.floor(s / 60), r = s % 60;
+  if (m < 60) return m + 'm ' + String(r).padStart(2, '0') + 's';
+  return Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
+}
+const ago = (s) => s < 5 ? 'just now' : fmtDur(s) + ' ago';
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+let settingsCache = {};
+function fmtClock(ts) { return new Date(ts * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+function fmtWhen(ts) {
+  const d = new Date(ts * 1000), n = new Date();
+  if (d.toDateString() === n.toDateString()) return fmtClock(ts);
+  const tmr = new Date(n); tmr.setDate(n.getDate() + 1);
+  if (d.toDateString() === tmr.toDateString()) return 'tomorrow ' + fmtClock(ts);
+  return d.toLocaleDateString([], { weekday: 'short' }) + ' ' + fmtClock(ts);
+}
+function fmtBytes(n) { return n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : Math.round(n / 1e6) + ' MB'; }
+function updateReady(s) {
+  const i = s.update_info;
+  return s.update_on_wake && i && i.status === 'update' && i.remote !== s.update_skip;
+}
+function fmtRate(kb) { return kb >= 1024 ? (kb / 1024).toFixed(1) + ' MB/s' : Math.round(kb) + ' KB/s'; }
+const ICON = {
+  hold: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>',
+  restart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>',
+  bolt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>',
+};
+function busyReason(s) {
+  if (!s.stats) return 'active';
+  const parts = [];
+  if (s.stats.cpu >= s.busy_cpu_effective) parts.push(s.stats.cpu + '% CPU');
+  if (s.stats.net != null && s.stats.net >= s.busy_net_effective) parts.push(fmtRate(s.stats.net));
+  return parts.join(' · ') || 'active';
+}
+
+function stateOf(s) {
+  if (s.transition) return s.transition;
+  if (s.status === 'running') return 'running';
+  if (s.status === 'missing') return 'missing';
+  return 'sleeping';
+}
+let httpsTrusted = false, lastUsername = null;
+function linksFor(s) {
+  const out = [];
+  if (s.https_url && httpsTrusted) out.push(s.https_url);
+  if (s.link_port) out.push(`http://${host}:${s.link_port}`);
+  s.hosts.forEach(h => out.push(`http://${h}`));
+  if (s.https_url && !httpsTrusted) out.push(s.https_url);
+  return out;
+}
+const LOCK = '<svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+
+/* ---------- controlled cards ---------- */
+function renderServices() {
+  const now = Date.now() / 1000 + offset;
+  const running = services.filter(s => s.status === 'running').length;
+  $('sum').textContent = services.length ? `${running} of ${services.length} awake` : '';
+  if (!services.length) {
+    $('list').innerHTML = '<div class="empty">Nothing yet. Tick <b>Enable Stowaway</b> on a container below.</div>';
+    return;
+  }
+  $('list').innerHTML = services.map(s => {
+    const st = stateOf(s), idleFor = now - s.idle_since, usedAgo = now - s.last_activity;
+    let idle;
+    if (st === 'updating') {
+      const u = s.update || {}, pct = Math.round(u.pct || 0);
+      const what = u.phase === 'installing' ? 'Installing' : u.phase === 'unpacking' ? 'Unpacking'
+        : u.total_bytes ? `${fmtBytes(u.done_bytes || 0)} of ${fmtBytes(u.total_bytes)}` : 'Downloading';
+      idle = `<div class="label"><span class="state">${ICON.down} Updating</span><b>${pct}%</b></div>` +
+             `<div class="bar busy"><i style="width:${pct}%"></i></div><div class="stats"><span>${esc(what)}</span></div>`;
+    } else if (st === 'maintenance') {
+      idle = `<div class="label"><span class="state">${ICON.restart} Maintenance</span><b>see Maintenance tab</b></div><div class="bar busy full"><i></i></div>`;
+    } else if (st === 'running' && s.forced === 'hold') {
+      idle = `<div class="label"><span class="state">${ICON.hold} Kept awake</span><b>${s.forced_until ? 'until ' + fmtWhen(s.forced_until) : 'until released'}</b></div><div class="bar held full"><i></i></div>`;
+    } else if (st === 'running' && s.forced === 'schedule') {
+      idle = `<div class="label"><span class="state">${ICON.clock} Awake hours</span><b>until ${fmtWhen(s.forced_until)}</b></div><div class="bar held full"><i></i></div>`;
+    } else if (st === 'running' && s.active > 0) {
+      idle = `<div class="label">In use <b>${s.active} request${s.active > 1 ? 's' : ''}</b></div><div class="bar full"><i></i></div>`;
+    } else if (st === 'running' && s.busy) {
+      idle = `<div class="label"><span class="state">${ICON.bolt} Busy</span><b>${esc(busyReason(s))}</b></div><div class="bar busy full"><i></i></div>`;
+    } else if (st === 'running' && s.idle_timeout > 0) {
+      const left = s.idle_timeout - idleFor, pct = Math.max(0, Math.min(100, left / s.idle_timeout * 100));
+      idle = `<div class="label">Sleeps in <b>${fmtDur(left)}</b></div><div class="bar ${pct < 20 ? 'low' : ''}"><i style="width:${pct}%"></i></div>`;
+    } else if (st === 'running') {
+      idle = `<div class="label">Auto-sleep <b>off</b></div>`;
+    } else {
+      idle = `<div class="label">Last used <b>${ago(usedAgo)}</b></div>` +
+        (s.next_awake ? `<div class="label"><span class="state" style="font-weight:400;color:var(--muted)">${ICON.clock} Wakes</span><b>${fmtWhen(s.next_awake)}</b></div>`
+                      : `<div class="label">Sleeps after <b>${s.idle_timeout ? fmtDur(s.idle_timeout) : 'never'}</b></div>`);
+    }
+    if (st === 'running' && s.stats) {
+      idle += `<div class="stats"><span>CPU <b>${s.stats.cpu}%</b></span>${s.stats.net != null ? `<span>Net <b>${fmtRate(s.stats.net)}</b></span>` : ''}</div>`;
+    }
+    const busy = !!s.transition;
+    const btn = st === 'running' || st === 'stopping'
+      ? `<button data-act="stop" data-n="${esc(s.name)}" ${busy ? 'disabled' : ''}>Sleep now</button>`
+      : `<button data-act="start" data-n="${esc(s.name)}" ${busy || st === 'missing' ? 'disabled' : ''}>Wake</button>`;
+    const links = linksFor(s);
+    const linkHtml = links.length
+      ? links.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">${u.startsWith('https:') ? LOCK : ''}${esc(u.replace(/^https?:\/\//, ''))}</a>`).join(', ')
+      : 'no link set';
+    const open = links.length ? `<a class="btn" href="${esc(links[0])}" target="_blank" rel="noopener">Open</a>` : '';
+    return `<div class="card">
+      <div>
+        <div class="name">${esc(s.name)} <span class="pill ${st}">${st === 'sleeping' && s.block_wake ? 'switched off' : st}</span></div>
+        <div class="meta">${linkHtml}</div>
+        <div class="meta">app port ${s.port}${s.upstream ? ' · via ' + esc(s.upstream.replace(/^https?:\/\//, '')) : ''}${s.via_macvlan ? '<span class="tag">macvlan</span>' : ''}${updateReady(s) ? '<span class="tag ready" title="Installs the next time it wakes">update ready</span>' : ''}${s.open_mode === 'direct' ? '<span class="tag" title="Browsers are sent to the app\'s own address after waking">opens directly</span>' : ''}${s.maintenance && s.maintenance.next_restart_text ? `<span class="tag" title="${esc(s.maintenance.schedule)}">restart ${esc(s.maintenance.next_restart_text)}</span>` : ''}</div>
+      </div>
+      <div class="idle">${idle}</div>
+      <div class="actions">${open}${btn}${s.forced === 'hold'
+        ? `<button data-act="release" data-n="${esc(s.name)}">Release</button>`
+        : `<button data-act="holdmenu" data-n="${esc(s.name)}">Keep awake</button>`}<button data-act="edit" data-n="${esc(s.name)}">Edit</button></div>
+      ${s.block_wake ? `<div class="warn">Switched off: visitors can't wake it (set from Home Assistant, the API or the Keep awake menu).<button data-act="unblock" data-n="${esc(s.name)}">Allow waking</button></div>` : ''}
+      ${s.update_error ? `<div class="warn">${esc(s.update_error)}<button data-act="retryupdate" data-n="${esc(s.name)}">Try again next wake</button></div>` : ''}
+      ${s.warning ? `<div class="warn">${esc(s.warning)}${/Settings/.test(s.warning) ? '<button data-act="settings">Open Settings</button>' : ''}</div>` : ''}
+      ${s.error && s.error !== s.warning ? `<div class="err">${esc(s.error)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+/* ---------- all containers ---------- */
+function portsText(c) {
+  if (c.network_mode === 'host') return 'host network';
+  if (c.macvlan_ip) return `macvlan ${c.macvlan_ip}` + (c.exposed.length ? ` · ${c.exposed.join(', ')}` : '');
+  if (c.published.length) return c.published.map(([cp, hp]) => cp === hp ? `${hp}` : `${hp}→${cp}`).join(', ');
+  if (c.exposed.length) return c.exposed.join(', ') + ' (not published)';
+  return 'no ports';
+}
+function renderContainers() {
+  const q = $('filter').value.trim().toLowerCase();
+  const rows = containers.filter(c => !q || (c.name + ' ' + c.image + ' ' + c.project).toLowerCase().includes(q));
+  if (!rows.length) {
+    $('containers').innerHTML = `<div class="crow"><span class="sub">${containers.length ? 'No containers match.' : 'Loading containers…'}</span></div>`;
+    return;
+  }
+  $('containers').innerHTML = rows.map(c => {
+    const on = !!c.controlled_by;
+    const st = c.status === 'running' ? 'running' : 'stopped';
+    return `<div class="crow ${on ? 'on' : ''}">
+      <label class="check"><input type="checkbox" data-c="${esc(c.name)}" ${on ? 'checked' : ''}> ${on ? 'Stowaway Enabled' : 'Enable Stowaway'}</label>
+      <div><div class="cname">${esc(c.name)}</div>
+        <div class="sub">${esc(c.image)}${c.project ? ' · ' + esc(c.project) : ''}${c.managed_by === 'truenas' ? '<span class="tag" title="Managed by TrueNAS Apps: Stowaway can start and stop it, but updates are left to TrueNAS">TrueNAS app</span>' : ''}</div></div>
+      <div class="ports">${esc(portsText(c))}</div>
+      <div><span class="pill ${st}">${st}</span></div>
+    </div>`;
+  }).join('');
+}
+
+async function refresh() {
+  try {
+    const d = await api('/services');
+    offset = d.now - Date.now() / 1000;
+    httpsTrusted = !!d.https_trusted;
+    lastUsername = d.username;
+    $('who').hidden = $('signOut').hidden = !d.username;
+    if (d.username) $('who').innerHTML = `Signed in as <b>${esc(d.username)}</b>`;
+    services = d.services;
+    $('demo').hidden = !d.demo;
+    renderServices();
+  } catch (e) { console.error(e); }
+}
+async function refreshContainers() {
+  try { containers = await api('/containers'); renderContainers(); } catch (e) { console.error(e); }
+}
+
+/* ---------- control dialog ---------- */
+function portHint(c) {
+  if (!c) return '';
+  if (c.exposed.length) return `This container listens on: <b>${c.exposed.join(', ')}</b>.`;
+  return 'No ports detected; enter the port the app listens on.';
+}
+function httpsFor(name) {
+  const st = settingsCache;
+  if (!st.https_enabled || !st.https_domain) return null;
+  const label = name.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63) || 'app';
+  return `https://${label}.${st.https_domain}${Number(st.https_port) === 443 ? '' : ':' + st.https_port}`;
+}
+function linkHint(c, linkPort) {
+  const url = `http://${host}:${linkPort || '…'}`;
+  let t = `You'll open it at <b>${esc(url)}</b>. Use that link in Heimdall, Homarr or a bookmark.`;
+  const hs = c && httpsFor(c.name);
+  if (hs) t += ` Over HTTPS: <b>${esc(hs)}</b>.`;
+  if (c && c.macvlan_ip) {
+    t += ` Its own address <b>${esc(c.macvlan_ip)}</b> keeps working while it's awake, but won't wake it up.`;
+    return t;
+  }
+  const pub = c && c.published.length ? c.published[0][1] : null;
+  if (pub) t += ` Its current address <b>:${pub}</b> keeps working while it's awake, but won't wake it up.`;
+  return t;
+}
+
+function openControl(c, svc) {
+  const f = $('form');
+  f.reset();
+  $('formErr').textContent = '';
+  editing = svc || null;
+  adding = svc ? null : c;
+  $('dlgTitle').textContent = svc ? `Edit ${svc.name}` : `Enable Stowaway for ${c.name}`;
+  $('saveBtn').textContent = svc ? 'Save' : 'Enable Stowaway';
+  $('release').hidden = !svc;
+  $('portList').innerHTML = (c ? c.exposed : []).map(p => `<option value="${p}">`).join('');
+  $('portHint').innerHTML = portHint(c);
+  if (svc) {
+    f.link_port.value = svc.link_port || '';
+    f.port.value = svc.port;
+    f.idle.value = Math.round(svc.idle_timeout / 60 * 100) / 100;
+    f.hosts.value = svc.hosts.join(', ');
+    f.upstream.value = svc.custom_upstream || '';
+    f.style.value = svc.start_page || '';
+    f.delay.value = svc.ready_delay ?? '';
+  } else {
+    f.link_port.value = c.suggested_link_port || '';
+    f.port.value = c.suggested_port || 80;
+    f.idle.value = 10;
+  }
+  const cpuDef = settingsCache.busy_cpu ?? 5, netDef = settingsCache.busy_net ?? 50;
+  f.busy_cpu.placeholder = `default ${cpuDef}`;
+  f.busy_net.placeholder = `default ${netDef}`;
+  f.busy_check.checked = svc ? svc.busy_check !== false : true;
+  f.open_mode.value = (svc && svc.open_mode) || 'proxy';
+  renderOpenHint();
+  f.upd_on.checked = !!(svc && svc.update_on_wake);
+  f.upd_every.value = svc && svc.update_on_wake ? svc.update_every : 24;
+  $('updCheck').hidden = !svc;
+  renderUpdHint(svc, c);
+  f.busy_cpu.value = svc && svc.busy_cpu != null ? svc.busy_cpu : '';
+  f.busy_net.value = svc && svc.busy_net != null ? svc.busy_net : '';
+  syncBusyRow();
+  let bh = 'Checked every few seconds. Leave the numbers empty to use the defaults from Settings.';
+  if (svc && svc.stats) bh = `Right now: CPU <b>${svc.stats.cpu}%</b>${svc.stats.net != null ? ` · network <b>${fmtRate(svc.stats.net)}</b>` : ''}. ` + bh;
+  if (c && c.network_mode === 'host') bh += ' Network use can\'t be measured for containers on the host network, so only CPU is checked.';
+  $('busyHint').innerHTML = bh;
+  $('hours').innerHTML = '';
+  (svc ? svc.awake_hours || [] : []).forEach(w => $('hours').appendChild(hourRow(w)));
+  $('hoursHint').innerHTML = `Stowaway starts the app when these hours begin and keeps it awake until they end. ` +
+    `Times are in <b>${esc(settingsCache.timezone_effective || 'UTC')}</b> (change it in Settings).`;
+  $('linkHint').innerHTML = linkHint(c, f.link_port.value);
+  f.link_port.oninput = () => { $('linkHint').innerHTML = linkHint(c, f.link_port.value); };
+  $('dlg').showModal();
+}
+
+$('containers').addEventListener('change', async (e) => {
+  const cb = e.target.closest('input[type=checkbox][data-c]');
+  if (!cb) return;
+  const c = containers.find(x => x.name === cb.dataset.c);
+  if (cb.checked) {
+    cb.checked = false;            // only ticks once saved
+    openControl(c, null);
+  } else {
+    cb.checked = true;             // only unticks once confirmed
+    await release(services.find(s => s.name === c.controlled_by), c);
+  }
+});
+
+async function release(svc, c) {
+  if (!svc) return;
+  if (!confirm(`Disable Stowaway for ${svc.name}?\n\nStowaway will no longer wake it or put it to sleep, and its link port ${svc.link_port || ''} will close. The container itself isn't changed.`)) return false;
+  const asleep = svc.status !== 'running';
+  const wake = asleep && confirm(`${svc.name} is asleep right now. Start it so it keeps running normally?`);
+  try {
+    await api(`/services/${encodeURIComponent(svc.name)}${wake ? '?start=true' : ''}`, { method: 'DELETE' });
+  } catch (err) { alert(err.message); }
+  await Promise.all([refresh(), refreshContainers()]);
+  return true;
+}
+
+$('release').onclick = async () => {
+  const svc = editing;
+  if (await release(svc, containers.find(x => x.name === svc.container))) $('dlg').close();
+};
+$('cancel').onclick = () => $('dlg').close();
+
+$('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const body = {
+    link_port: Number(f.link_port.value) || null,
+    port: Number(f.port.value) || 80,
+    idle_timeout: Math.round(Number(f.idle.value || 0) * 60),
+    hosts: f.hosts.value.split(',').map(h => h.trim()).filter(Boolean),
+    upstream: f.upstream.value.trim() || null,
+    start_page: f.style.value || null,
+    ready_delay: f.delay.value === '' ? null : Number(f.delay.value),
+    busy_check: f.busy_check.checked,
+    update_on_wake: f.upd_on.checked,
+    open_mode: f.open_mode.value,
+    update_every: Number(f.upd_every.value || 0),
+    busy_cpu: f.busy_cpu.value === '' ? null : Number(f.busy_cpu.value),
+    busy_net: f.busy_net.value === '' ? null : Number(f.busy_net.value),
+    awake_hours: readHours(),
+  };
+  if (body.awake_hours.some(w => !w.days.length)) { $('formErr').textContent = 'Pick at least one day for each awake-hours entry.'; return; }
+  if (body.awake_hours.some(w => !w.from || !w.to || w.from === w.to)) { $('formErr').textContent = 'Each awake-hours entry needs different start and end times.'; return; }
+  try {
+    if (editing) await api(`/services/${encodeURIComponent(editing.name)}`, { method: 'PATCH', body: JSON.stringify(body) });
+    else await api('/services', { method: 'POST', body: JSON.stringify({ name: adding.name, container: adding.name, ...body }) });
+    $('dlg').close();
+    await Promise.all([refresh(), refreshContainers()]);
+  } catch (err) { $('formErr').textContent = err.message; }
+});
+
+$('list').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-act]');
+  if (!b) return;
+  const name = b.dataset.n, act = b.dataset.act;
+  if (act === 'settings') return $('settingsBtn').click();
+  if (act === 'holdmenu') return openMenu(b, name);
+  if (act === 'unblock') {
+    b.disabled = true;
+    try { await api(`/services/${encodeURIComponent(name)}/block`, { method: 'POST', body: JSON.stringify({ on: false }) }); } catch (err) { alert(err.message); }
+    return refresh();
+  }
+  if (act === 'retryupdate') {
+    b.disabled = true;
+    try { await api(`/services/${encodeURIComponent(name)}/retry-update`, { method: 'POST' }); } catch (err) { alert(err.message); }
+    return refresh();
+  }
+  if (act === 'release') {
+    b.disabled = true;
+    try { await api(`/services/${encodeURIComponent(name)}/hold`, { method: 'POST', body: JSON.stringify({}) }); }
+    catch (err) { alert(err.message); }
+    return refresh();
+  }
+  const svc = services.find(s => s.name === name);
+  if (act === 'edit') return openControl(containers.find(c => c.name === svc.container), svc);
+  b.disabled = true;
+  try { await api(`/services/${encodeURIComponent(name)}/${act}`, { method: 'POST' }); }
+  catch (err) { alert(err.message); }
+  refresh();
+});
+
+$('filter').addEventListener('input', renderContainers);
+
+/* ---------- keep awake menu ---------- */
+let menuFor = null;
+function openMenu(btn, name) {
+  const m = $('menu'), r = btn.getBoundingClientRect();
+  menuFor = name;
+  m.hidden = false;
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)) + 'px';
+  m.style.top = (r.bottom + h + 8 > window.innerHeight ? r.top - h - 6 : r.bottom + 6) + 'px';
+}
+function closeMenu() { $('menu').hidden = true; menuFor = null; }
+document.addEventListener('click', (e) => {
+  if (!$('menu').hidden && !e.target.closest('#menu') && !e.target.closest('[data-act="holdmenu"]')) closeMenu();
+});
+window.addEventListener('scroll', closeMenu, { passive: true });
+window.addEventListener('resize', closeMenu);
+$('menu').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-hold]');
+  if (!b || !menuFor) return;
+  const name = menuFor, v = b.dataset.hold;
+  closeMenu();
+  if (v === 'off') {
+    try { await api(`/services/${encodeURIComponent(name)}/stop?block=true`, { method: 'POST' }); } catch (err) { alert(err.message); }
+    return refresh();
+  }
+  try {
+    await api(`/services/${encodeURIComponent(name)}/hold`, { method: 'POST',
+      body: JSON.stringify(v === 'forever' ? { forever: true } : { minutes: Number(v) }) });
+  } catch (err) { alert(err.message); }
+  refresh();
+});
+
+/* ---------- awake hours editor ---------- */
+function hourRow(w) {
+  const div = document.createElement('div');
+  div.className = 'hrow';
+  div.innerHTML = `<div class="days">${DAYS.map((d, i) =>
+      `<button type="button" class="day ${w.days.includes(i) ? 'on' : ''}" data-d="${i}" aria-pressed="${w.days.includes(i)}">${d}</button>`).join('')}</div>
+    <div class="times"><input type="time" class="from" value="${esc(w.from)}" required><span>to</span>
+      <input type="time" class="to" value="${esc(w.to)}" required>
+      <button type="button" class="rm" title="Remove">Remove</button></div>`;
+  return div;
+}
+$('hours').addEventListener('click', (e) => {
+  const d = e.target.closest('.day');
+  if (d) { d.classList.toggle('on'); d.setAttribute('aria-pressed', d.classList.contains('on')); return; }
+  const rm = e.target.closest('.rm');
+  if (rm) rm.closest('.hrow').remove();
+});
+$('addHours').onclick = () => $('hours').appendChild(hourRow({ days: [0, 1, 2, 3, 4, 5, 6], from: '18:00', to: '23:00' }));
+function readHours() {
+  return [...$('hours').querySelectorAll('.hrow')].map(r => ({
+    days: [...r.querySelectorAll('.day.on')].map(b => Number(b.dataset.d)),
+    from: r.querySelector('.from').value, to: r.querySelector('.to').value,
+  }));
+}
+function syncBusyRow() { $('busyRow').style.opacity = $('form').busy_check.checked ? 1 : .45; }
+$('form').busy_check.addEventListener('change', syncBusyRow);
+
+/* ---------- settings ---------- */
+$('settingsBtn').onclick = async () => {
+  $('setErr').textContent = '';
+  $('statusEx').textContent = `${location.origin}${location.pathname.replace(/\/$/, '')}/status/NAME`;
+  try {
+    const st = await api('/settings');
+    $('setForm').uas.value = st.ignore_user_agents.join('\n');
+    $('setForm').ips.value = st.ignore_ips.join('\n');
+    $('setForm').shim.value = st.macvlan_shim_ip || '';
+    $('setForm').style.value = st.start_page || 'loading_name';
+    $('setForm').custom.value = st.start_page_custom || '';
+    $('setForm').delay.value = st.ready_delay ?? 0;
+    const f = $('setForm');
+    f.https_on.checked = !!st.https_enabled;
+    f.https_domain.value = st.https_domain || '';
+    f.https_port.value = st.https_port || 8443;
+    f.cert_source.value = st.cert_source || 'selfsigned';
+    f.le_email.value = st.le_email || '';
+    f.le_staging.checked = !!st.le_staging;
+    f.http_challenge_port.value = st.http_challenge_port || 8480;
+    f.duckdns_token.value = ''; f.cloudflare_token.value = '';
+    f.duckdns_token.placeholder = st.duckdns_token_set ? 'saved (leave blank to keep)' : '';
+    f.cloudflare_token.placeholder = st.cloudflare_token_set ? 'saved (leave blank to keep)' : '';
+    f.lan_only.checked = st.admin_lan_only !== false;
+    syncHttps();
+    loadCert();
+    loadDiag();
+    $('accountSection').hidden = !lastUsername;
+    resetAccountForm(lastUsername);
+    $('setForm').bcpu.value = st.busy_cpu ?? 5;
+    $('setForm').bnet.value = st.busy_net ?? 50;
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    $('setForm').tz.value = st.timezone || browserTz;
+    $('tzHint').innerHTML = `Server time right now: <b>${esc(st.server_time)}</b> (${esc(st.timezone_effective)}).` +
+      (!st.timezone && browserTz ? ` Filled in from this browser; click Save to use it.` : '');
+    if (!$('tzList').options.length && Intl.supportedValuesOf) {
+      $('tzList').innerHTML = Intl.supportedValuesOf('timeZone').map(z => `<option value="${esc(z)}">`).join('');
+    }
+    toggleCustom();
+    const mv = st.macvlan_networks || [];
+    $('mvHint').innerHTML = (mv.length
+      ? `Found: ${mv.map(n => `<b>${esc(n.name)}</b> (${esc(n.driver)} on ${esc(n.parent || '?')}${n.subnet ? ', ' + esc(n.subnet) : ''})`).join(', ')}. `
+      : 'No macvlan networks found on this server. ')
+      + 'The server can\'t talk to its own macvlan containers directly, so Stowaway adds a small helper with this address. '
+      + 'Pick a free address on your network: outside your router\'s DHCP range and not used by any device or container. '
+      + 'Not needed if the server can already reach them, for example with Unraid\'s <i>Host access to custom networks</i> or a macvlan shim you set up yourself; Stowaway uses that automatically.';
+  } catch (e) { $('setErr').textContent = e.message; }
+  $('setDlg').showModal();
+};
+$('setCancel').onclick = () => $('setDlg').close();
+function toggleCustom() { $('customWrap').hidden = $('setForm').style.value !== 'custom'; }
+$('setForm').style.addEventListener('change', toggleCustom);
+function preview(page) {
+  const f = $('setForm');
+  const q = new URLSearchParams({ page, style: f.style.value, custom: f.custom.value, name: 'Jellyfin' });
+  window.open(`${API.replace(/\/api$/, '')}/preview?${q}`, '_blank', 'noopener');
+}
+$('prevStart').onclick = () => preview('start');
+$('prevError').onclick = () => preview('error');
+$('prevUpdate').onclick = () => preview('update');
+async function saveSettings() {
+  const t = $('setForm');
+  const lines = (v) => v.split('\n').map(x => x.trim()).filter(Boolean);
+  $('setErr').textContent = '';
+  try {
+    await api('/settings', { method: 'PUT', body: JSON.stringify({
+      ignore_user_agents: lines(t.uas.value), ignore_ips: lines(t.ips.value),
+      macvlan_shim_ip: t.shim.value.trim(),
+      start_page: t.style.value, start_page_custom: t.custom.value.trim(),
+      ready_delay: Number(t.delay.value || 0),
+      busy_cpu: Number(t.bcpu.value || 0), busy_net: Number(t.bnet.value || 0),
+      timezone: t.tz.value.trim(),
+      https_enabled: t.https_on.checked, https_domain: t.https_domain.value.trim(),
+      https_port: Number(t.https_port.value || 8443), cert_source: t.cert_source.value,
+      le_email: t.le_email.value.trim(), le_staging: t.le_staging.checked,
+      duckdns_token: t.duckdns_token.value.trim() || null, cloudflare_token: t.cloudflare_token.value.trim() || null,
+      http_challenge_port: Number(t.http_challenge_port.value || 8480),
+      admin_lan_only: t.lan_only.checked }) });
+    await loadSettings();
+    refresh();
+    return true;
+  } catch (err) { $('setErr').textContent = err.message; return false; }
+}
+$('setForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (await saveSettings()) $('setDlg').close();
+});
+
+/* ---------- resources saved ---------- */
+let svPeriod = 'week', svData = null;
+function fmtMem(mb) {
+  if (mb >= 1024) return `${(mb / 1024).toFixed(mb >= 10240 ? 0 : 1)}<small>GB</small>`;
+  return `${Math.round(mb)}<small>MB</small>`;
+}
+function fmtHours(h) {
+  if (h < 1) return `${Math.round(h * 60)}<small>min</small>`;
+  if (h < 48) return `${h.toFixed(h < 10 ? 1 : 0)}<small>h</small>`;
+  return `${(h / 24).toFixed(h < 240 ? 1 : 0)}<small>days</small>`;
+}
+function fmtCount(n) {
+  const units = [[1e15, 'quadrillion'], [1e12, 'trillion'], [1e9, 'billion'], [1e6, 'million']];
+  for (const [v, w] of units) if (n >= v) return `${(n / v).toFixed(n / v < 10 ? 1 : 0)} ${w}`;
+  return Math.round(n).toLocaleString();
+}
+function renderSavings() {
+  const d = svData;
+  $('savings').hidden = !d || !d.now.controlled;
+  if (!d || !d.now.controlled) return;
+  const n = d.now, per = d[svPeriod];
+  $('sv-mem').innerHTML = fmtMem(n.mem_mb);
+  $('sv-mem-bar').style.width = Math.min(100, (n.mem_share || 0) * 100) + '%';
+  $('sv-mem-sub').textContent = `${n.mem_share != null ? Math.round(n.mem_share * 1000) / 10 + '% of RAM · ' : ''}${n.asleep} of ${n.controlled} app${n.controlled === 1 ? '' : 's'} asleep`;
+  const cpuPct = n.cpu_share * 100;
+  $('sv-cpu').innerHTML = `${cpuPct < 10 ? cpuPct.toFixed(1) : Math.round(cpuPct)}<small>%</small>`;
+  $('sv-cpu-bar').style.width = Math.min(100, cpuPct) + '%';
+  $('sv-cpu-sub').textContent = `of the whole CPU · ${(n.cpu_pct / 100).toFixed(2)} of ${d.host.ncpu} cores`;
+  $('sv-cput').innerHTML = fmtHours(per.cpu_hours);
+  $('sv-cput-sub').textContent = d.host.mhz && per.cycles ? `≈ ${fmtCount(per.cycles)} CPU cycles` : 'of processor time';
+  const since = Math.max(1, (Date.now() / 1000 - d.since) / 3600);
+  const span = svPeriod === 'week' ? Math.min(since, 24 * 7) : since;
+  $('sv-avg').innerHTML = fmtMem(per.gb_hours * 1024 / span);
+  $('sv-avg-sub').innerHTML = `apps slept ${fmtHours(per.asleep_hours).replace(/<small>|<\/small>/g, ' ').trim()} in total`;
+  let note = 'Estimates: each app\'s usage while idle, counted for the time it spends asleep.';
+  if (d.learning.length) note += ` Still learning ${d.learning.map(esc).join(', ')}: an app needs to run idle for a couple of minutes first.`;
+  if (d.self) note += ` Stowaway itself uses ${Math.round(d.self.mem_mb)} MB` +
+    (d.self.cpu_pct == null ? '.' : ` and ${d.self.cpu_pct < 0.1 ? 'under 0.1' : d.self.cpu_pct.toFixed(1)}% of one CPU core.`);
+  $('sv-note').innerHTML = note;
+}
+async function refreshSavings() {
+  try { svData = await api('/savings'); renderSavings(); } catch (e) { console.error(e); }
+}
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+  svPeriod = b.dataset.p;
+  document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  renderSavings();
+}));
+
+/* ---------- when opened ---------- */
+function directFor(svc, c, port) {
+  if (svc && svc.direct && String(svc.port) === String(port)) return svc.direct;
+  if (!c) return null;
+  if (c.network_mode === 'host') return { host: null, port };
+  if (c.macvlan_ip) return { host: c.macvlan_ip, port };
+  const pub = (c.published || []).find(([cp]) => String(cp) === String(port));
+  if (pub) return { host: null, port: pub[1] };
+  return { reason: `port ${port} isn't published on the server and the app isn't on a macvlan network, so browsers have no address to reach it directly` };
+}
+function renderOpenHint() {
+  const f = $('form'), svc = editing, c = svc ? containers.find(x => x.name === svc.container) : adding;
+  const d = directFor(svc, c, Number(f.port.value) || 80);
+  const where = d && d.port ? `http://${esc(d.host || host)}:${d.port}` : null;
+  let h;
+  if (f.open_mode.value === 'proxy') {
+    h = 'Your browser stays on the link and Stowaway passes everything through, so it always knows when the app is in use. Best for almost every app.';
+    if (where) h += ` Its own address is <b>${where}</b>.`;
+  } else if (!where) {
+    h = `<span style="color:var(--warn)">Not possible for this app: ${esc(d ? d.reason : 'its address is unknown')}. It will stay on Stowaway's address.</span>`;
+  } else {
+    h = `After waking, browsers are sent to <b>${where}</b>. Apps and API clients still go through the link. ` +
+        '<span style="color:var(--warn)">Stowaway then only knows the app is in use from its CPU and network activity</span>, ' +
+        'so keep <i>Stay awake while busy</i> on and consider a longer idle time. Use this only for apps that misbehave on Stowaway\'s address.';
+  }
+  $('openHint').innerHTML = h;
+}
+$('form').open_mode.addEventListener('change', renderOpenHint);
+$('form').port.addEventListener('input', renderOpenHint);
+
+/* ---------- updates ---------- */
+function renderUpdHint(svc, c) {
+  const f = $('form');
+  $('updEveryWrap').style.opacity = f.upd_on.checked ? 1 : .45;
+  const image = (svc && svc.update_info && svc.update_info.ref) || (c && c.image) || 'its image';
+  let h = `If <b>${esc(image)}</b> has a newer version, visitors see an <i>Updating</i> page while it downloads, then your start page. ` +
+          `Settings, volumes and networks are kept, and if the new version won't start, the previous one is put back.`;
+  const i = svc && svc.update_info;
+  if (i && i.at) {
+    const when = ago(Date.now() / 1000 + offset - i.at);
+    const state = i.status === 'current' ? '<span style="color:var(--ok)">up to date</span>'
+      : i.status === 'update' ? (i.remote === svc.update_skip ? 'a newer version exists, but it failed last time'
+                                                              : '<span style="color:#8b5cf6">a newer version is ready</span>, it installs the next time the app wakes')
+      : i.status === 'unsupported' ? `can't update automatically: ${esc(i.detail)}`
+      : `couldn't check: ${esc(i.detail || 'no answer')}`;
+    h += `<br>Last checked ${when}: ${state}.`;
+  }
+  $('updHint').innerHTML = h;
+}
+$('form').upd_on.addEventListener('change', () => renderUpdHint(editing, containers.find(x => editing && x.name === editing.container)));
+$('updCheck').onclick = async () => {
+  if (!editing) return;
+  const b = $('updCheck');
+  b.disabled = true; b.textContent = 'Checking…';
+  try {
+    editing = await api(`/services/${encodeURIComponent(editing.name)}/check-update`, { method: 'POST' });
+    renderUpdHint(editing, containers.find(x => x.name === editing.container));
+    refresh();
+  } catch (err) { $('formErr').textContent = err.message; }
+  b.disabled = false; b.textContent = 'Check now';
+};
+
+/* ---------- account ---------- */
+$('signOut').onclick = async () => {
+  try { await fetch(location.pathname.replace(/\/$/, '') + '/auth/logout', { method: 'POST', credentials: 'same-origin', headers: { 'X-Stowaway': '1' } }); } catch {}
+  location.replace(location.pathname);
+};
+function acctRules() {
+  const f = $('setForm'), pw = f.acct_new.value;
+  $('acctRules').hidden = !pw;
+  const res = { len: pw.length >= 8, letter: /[A-Za-z]/.test(pw), number: /[0-9]/.test(pw),
+                special: /[^A-Za-z0-9]/.test(pw), match: pw.length > 0 && pw === f.acct_confirm.value };
+  for (const li of $('acctRules').children) li.classList.toggle('ok', res[li.dataset.r]);
+  return !pw || Object.values(res).every(Boolean);
+}
+['acct_new', 'acct_confirm'].forEach(n => $('setForm')[n].addEventListener('input', acctRules));
+function resetAccountForm(username) {
+  const f = $('setForm');
+  f.acct_user.value = username || '';
+  f.acct_new.value = f.acct_confirm.value = f.acct_current.value = '';
+  $('acctMsg').textContent = ''; $('acctMsg').className = 'formerr';
+  acctRules();
+}
+$('acctBtn').onclick = async () => {
+  const f = $('setForm'), msg = $('acctMsg');
+  msg.className = 'formerr';
+  if (!acctRules()) { msg.textContent = 'The new password doesn\'t meet all the rules yet.'; return; }
+  if (!f.acct_current.value) { msg.textContent = 'Enter your current password.'; return; }
+  try {
+    const d = await api('/account', { method: 'POST', body: JSON.stringify({
+      current_password: f.acct_current.value, username: f.acct_user.value.trim(),
+      new_password: f.acct_new.value || null }) });
+    resetAccountForm(d.username);
+    msg.textContent = 'Account updated.'; msg.className = 'formerr ok';
+    refresh();
+  } catch (err) { msg.textContent = err.message; }
+};
+
+/* ---------- HTTPS ---------- */
+const CERT_HELP = {
+  selfsigned: 'Stowaway makes its own certificate. Traffic is encrypted, but browsers show a warning the first time and some TV apps refuse it. Fine for trying HTTPS out.',
+  duckdns: 'Free: sign in at <b>duckdns.org</b>, create a name (e.g. <i>myhome</i>) and point it at your home\'s public IP. Enter <b>myhome.duckdns.org</b> as the domain. Stowaway gets a certificate for <b>*.myhome.duckdns.org</b> and renews it automatically. No ports need opening for the certificate itself.',
+  cloudflare: 'For your own domain managed by Cloudflare. Create an API token under My Profile → API Tokens using the <b>Edit zone DNS</b> template. Stowaway gets a certificate for the domain and <b>*.domain</b>, and renews it automatically.',
+  http: 'Works with any domain. Your router must forward internet <b>port 80</b> to the HTTP check port below, and each app name (e.g. <i>jellyfin.yourdomain</i>) must point to your public IP. The certificate is updated automatically when you enable new apps.',
+  custom: 'Put <b>fullchain.pem</b> and <b>privkey.pem</b> in <b>config/certs/custom</b> inside the Stowaway folder, then click the button below. Replace the files whenever your certificate is renewed.',
+};
+function syncHttps() {
+  const f = $('setForm'), src = f.cert_source.value, le = ['duckdns', 'cloudflare', 'http'].includes(src);
+  $('httpsFields').style.display = f.https_on.checked ? '' : 'none';
+  $('httpsFields').querySelectorAll('[data-src]').forEach(el => {
+    el.style.display = (el.dataset.src === src || (el.dataset.src === 'le' && le)) ? '' : 'none';
+  });
+  $('certHelp').innerHTML = CERT_HELP[src] || '';
+  $('certBtn').textContent = src === 'custom' ? 'Save and load my files' : src === 'selfsigned' ? 'Save and make a new certificate' : 'Save and get certificate';
+  $('lanHint').innerHTML = f.lan_only.checked
+    ? 'People outside your network can still open your apps, but not this dashboard.'
+    : '<span style="color:var(--warn)">Anyone on the internet who can reach this port can try to log in. Use a strong password.</span>';
+}
+['https_on', 'cert_source', 'lan_only'].forEach(n => $('setForm')[n].addEventListener('change', syncHttps));
+
+let certTimer = null;
+function fmtDate(ts) { return new Date(ts * 1000).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }); }
+async function loadCert() {
+  clearTimeout(certTimer);
+  let st;
+  try { st = await api('/cert'); } catch { return; }
+  const box = $('certStatus');
+  let h = '';
+  if (!st.https_enabled) { box.innerHTML = ''; return; }
+  if (st.busy) h += '<div class="warnc">Working on the certificate… Let\'s Encrypt can take a minute or two.</div>';
+  if (st.has_cert) {
+    const days = Math.round((st.not_after - Date.now() / 1000) / 86400);
+    const kind = st.self_signed ? 'Self-signed' : esc(st.issuer || 'Certificate');
+    const shown = st.names.filter(n => !/^\d/.test(n) && n !== 'localhost');
+    h += `<div><span class="ok">${kind}</span> for ${esc(shown.slice(0, 4).join(', '))}${shown.length > 4 ? ` +${shown.length - 4} more` : ''}` +
+         ` · valid until ${fmtDate(st.not_after)} (${days} days)</div>`;
+    if (st.missing_names.length) h += `<div class="warnc">Doesn't cover yet: ${esc(st.missing_names.join(', '))}</div>`;
+  } else if (!st.busy && !st.error) {
+    h += '<div class="warnc">No certificate yet.</div>';
+  }
+  if (st.listening && st.dashboard_url) h += `<div>Dashboard over HTTPS: <a href="${esc(st.dashboard_url)}" target="_blank" rel="noopener">${esc(st.dashboard_url.replace(/^https:\/\//, ''))}</a></div>`;
+  if (st.listen_error) h += `<div class="bad">${esc(st.listen_error)}</div>`;
+  if (st.error) h += `<div class="bad">${esc(st.error)}</div>`;
+  if (st.log && (st.error || st.busy)) h += `<details><summary>Details</summary><pre>${esc(st.log)}</pre></details>`;
+  box.innerHTML = h;
+  const settling = st.busy || (st.has_cert && !st.listening && !st.listen_error);
+  if (settling && $('setDlg').open) certTimer = setTimeout(loadCert, st.busy ? 2000 : 700);
+}
+$('certBtn').onclick = async () => {
+  const b = $('certBtn');
+  b.disabled = true;
+  try {
+    if (await saveSettings()) {
+      await api('/cert/renew', { method: 'POST' });
+      await loadCert();
+    }
+  } catch (err) { $('setErr').textContent = err.message; }
+  b.disabled = false;
+};
+
+/* ---------- tabs ---------- */
+let tab = location.hash === '#maintenance' ? 'maint' : 'apps';
+function showTab(t) {
+  tab = t;
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+  $('tab-apps').hidden = t !== 'apps';
+  $('tab-maint').hidden = t !== 'maint';
+  history.replaceState(null, '', t === 'maint' ? '#maintenance' : location.pathname + location.search);
+  if (t === 'maint') refreshMaint();
+}
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+/* ---------- maintenance ---------- */
+let mData = null, mEditing = null;
+const RES = { ok: 'Restarted', updated: 'Updated', skipped: 'Skipped', missed: 'Missed', rolled_back: 'Rolled back', failed: 'Failed' };
+const PHASE = { starting: 'Starting', 'checking for updates': 'Checking for updates', downloading: 'Downloading new version',
+  unpacking: 'Unpacking', installing: 'Installing', restarting: 'Restarting', checking: 'Making sure it stays up',
+  'rolling back': 'Putting the previous version back' };
+function fmtDay(ts) {
+  const d = new Date(ts * 1000), n = new Date();
+  const days = Math.round((new Date(d.toDateString()) - new Date(n.toDateString())) / 86400000);
+  if (days === 0) return 'today ' + fmtClock(ts);
+  if (days === 1) return 'tomorrow ' + fmtClock(ts);
+  if (days > 1 && days < 7) return d.toLocaleDateString([], { weekday: 'long' }) + ' ' + fmtClock(ts);
+  return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) + ' ' + fmtClock(ts);
+}
+function agoLong(s) {
+  if (s < 36 * 3600) return ago(s);
+  return Math.round(s / 86400) + ' days ago';
+}
+function renderMaint() {
+  const d = mData;
+  if (!d) { $('mList').innerHTML = '<div class="mrow"><span class="sub">Loading…</span></div>'; return; }
+  const scheduled = d.items.filter(i => i.schedule).length;
+  $('mCount').hidden = !scheduled; $('mCount').textContent = scheduled;
+  $('mTz').innerHTML = `Times in <b>${esc(d.timezone)}</b> · now ${esc(d.server_time)}`;
+  const q = $('mFilter').value.trim().toLowerCase();
+  const rows = d.items.filter(i => !q || (i.name + ' ' + (i.image || '') + ' ' + (i.project || '')).toLowerCase().includes(q));
+  if (!rows.length) { $('mList').innerHTML = `<div class="mrow"><span class="sub">${d.items.length ? 'No containers match.' : 'No containers found.'}</span></div>`; return; }
+  const now = Date.now() / 1000 + offset;
+  $('mList').innerHTML = rows.map(i => {
+    const st = i.status === 'running' ? 'running' : i.status === 'missing' ? 'missing' : i.controlled ? 'sleeping' : 'stopped';
+    const pillSt = i.progress ? 'maintenance' : st;
+    let sched = `<div class="sched off">Not scheduled</div>`;
+    if (i.schedule) {
+      sched = `<div class="sched">${esc(i.summary)}</div>` +
+        (i.next_run ? `<div class="sub">Next: ${esc(fmtDay(i.next_run))}${i.schedule.busy_wait ? '' : ' · restarts even if busy'}</div>` : '');
+    }
+    let last;
+    if (i.progress) {
+      const p = i.progress, pct = p.pct != null ? Math.round(p.pct) : null;
+      const bytes = p.phase === 'downloading' && p.total_bytes ? ` · ${fmtBytes(p.done_bytes || 0)} of ${fmtBytes(p.total_bytes)}` : '';
+      last = `<div class="mprog"><div class="label" style="display:flex;justify-content:space-between;gap:8px"><span class="state" style="font-weight:600;color:var(--fg)">${esc(PHASE[p.phase] || p.phase)}${bytes}</span><b>${pct != null ? pct + '%' : fmtDur(now - p.since)}</b></div>
+        <div class="bar busy ${pct == null ? 'full' : ''}"><i style="${pct != null ? `width:${pct}%` : ''}"></i></div></div>`;
+    } else if (i.queued) {
+      last = `<div class="last"><span class="res waiting">Waiting its turn</span></div>`;
+    } else if (i.waiting) {
+      last = `<div class="last"><span class="res waiting">Waiting</span><span class="msg">${esc(i.waiting.replace(/^busy: /, 'Busy: '))}. Stowaway checks again every 10 minutes.</span></div>`;
+    } else if (i.last) {
+      const L = i.last;
+      last = `<div class="last"><span class="res ${esc(L.result)}">${esc(RES[L.result] || L.result)}</span>
+        <span class="msg">${esc(L.message)}</span><span>${L.manual ? 'Run by hand ' : ''}${esc(agoLong(now - L.at))}</span>
+        ${i.bad_version && !i.progress ? `<button type="button" class="linkbtn" data-m="retry" data-n="${esc(i.name)}">Allow that version next time</button>` : ''}</div>`;
+    } else {
+      last = `<div class="last">${i.schedule ? 'Hasn\'t run yet' : ''}</div>`;
+    }
+    const busy = !!(i.progress || i.queued);
+    return `<div class="mrow ${i.schedule ? 'on' : ''}">
+      <div><div class="cname">${esc(i.name)} <span class="pill ${pillSt}">${i.progress ? 'maintenance' : st}</span></div>
+        <div class="sub">${esc(i.image || 'container not found')}${i.controlled ? ' · sleeps with Stowaway' : ''}${i.managed_by === 'truenas' ? '<span class="tag" title="Updates are left to TrueNAS">TrueNAS app</span>' : ''}</div></div>
+      <div>${sched}</div>
+      ${last}
+      <div class="actions">
+        ${i.status !== 'missing' ? `<button data-m="run" data-n="${esc(i.name)}" ${busy ? 'disabled' : ''}>Run now</button>` : ''}
+        ${i.status !== 'missing' ? `<button data-m="edit" data-n="${esc(i.name)}">${i.schedule ? 'Change' : 'Schedule'}</button>`
+                                  : `<button data-m="remove" data-n="${esc(i.name)}" class="danger" ${busy ? 'disabled' : ''}>Remove</button>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+async function refreshMaint() {
+  try { mData = await api('/maintenance'); renderMaint(); } catch (e) { console.error(e); }
+}
+$('mFilter').addEventListener('input', renderMaint);
+$('mList').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-m]');
+  if (!b) return;
+  const name = b.dataset.n, act = b.dataset.m, item = mData.items.find(i => i.name === name);
+  const path = `/maintenance/${encodeURIComponent(name)}`;
+  if (act === 'edit') return openSchedule(item);
+  if (act === 'run') {
+    const upd = item.schedule && item.schedule.update;
+    const what = item.status === 'running'
+      ? `Restart ${name} now${upd ? ', updating it first if a newer version exists' : ''}?`
+      : upd ? `${name} isn't running. Check for a newer version now and install it if there is one?`
+            : `${name} isn't running, so there's nothing to restart. Run anyway?`;
+    if (!confirm(what + (upd || item.status === 'running' ? '\n\nIt restarts right away, even if it\'s busy.' : ''))) return;
+  }
+  if (act === 'remove' && !confirm(`Forget the schedule for ${name}? The container no longer exists.`)) return;
+  b.disabled = true;
+  try {
+    if (act === 'run') await api(path + '/run', { method: 'POST' });
+    if (act === 'retry') { await api(path + '/retry-update', { method: 'POST' }); mData.items.find(x => x.name === name).bad_version = false; }
+    if (act === 'remove') await api(path, { method: 'DELETE' });
+  } catch (err) { alert(err.message); }
+  refreshMaint();
+});
+
+function mdayOptions() {
+  const sfx = (n) => (n % 100 >= 11 && n % 100 <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+  return Array.from({ length: 28 }, (_, k) => `<option value="${k + 1}">${k + 1}${sfx(k + 1)}</option>`).join('') +
+    '<option value="last">Last day of the month</option>';
+}
+$('mForm').mday.innerHTML = mdayOptions();
+function syncSchedule() {
+  const f = $('mForm'), freq = f.freq.value, off = freq === 'off';
+  $('mWhen').hidden = off; $('mOpts').hidden = off;
+  $('mWeekday').hidden = freq !== 'weekly';
+  $('mMday').hidden = freq !== 'monthly';
+  $('mWhen').style.gridTemplateColumns = freq === 'daily' ? '1fr' : '';
+  const i = mEditing;
+  let uh = 'Downloads it first while the container keeps running, so it\'s only down for the swap. Settings, volumes and networks are kept. If the new version doesn\'t stay up, the previous version is put back.';
+  if (i && i.controlled && i.status !== 'running') uh += ' Since it\'s asleep, it\'s started to check the new version works and then put back to sleep.';
+  if (i && i.managed_by === 'truenas') uh = '<span style="color:var(--warn)">This is a TrueNAS app, so updates are left to TrueNAS (Apps page). Scheduled restarts still work.</span>';
+  $('mUpdHint').innerHTML = uh;
+  const bw = Number(f.busy_wait.value || 0);
+  $('mBusyHint').innerHTML = bw
+    ? `Busy means CPU above <b>${settingsCache.busy_cpu ?? 5}%</b> or network above <b>${settingsCache.busy_net ?? 50} KB/s</b> (Settings)${i && i.controlled ? ', or someone using it through Stowaway' : ''}. After ${bw} hour${bw === 1 ? '' : 's'} it's skipped until next time.`
+    : 'Restarts at the scheduled time even if it\'s in the middle of something.';
+  $('mNext').innerHTML = off ? (i && i.schedule ? 'Saving turns the schedule off.' : '')
+    : `Times are in <b>${esc((mData && mData.timezone) || settingsCache.timezone_effective || 'UTC')}</b>. ` +
+      (freq === 'monthly' ? 'Days 29–31 aren\'t offered since not every month has them; use <i>Last day</i> instead.' : '');
+}
+['freq', 'busy_wait'].forEach(n => $('mForm')[n].addEventListener('input', syncSchedule));
+function openSchedule(i) {
+  mEditing = i;
+  const f = $('mForm'), s = i.schedule || {};
+  $('mErr').textContent = '';
+  $('mTitle').textContent = `Scheduled restart: ${i.name}`;
+  f.freq.value = s.freq || 'weekly';
+  f.weekday.value = String(s.weekday ?? 6);
+  f.mday.value = String(s.mday ?? 1);
+  f.time.value = s.time || '04:00';
+  f.update.checked = !!s.update;
+  f.busy_wait.value = s.busy_wait ?? 6;
+  syncSchedule();
+  $('mDlg').showModal();
+}
+$('mCancel').onclick = () => $('mDlg').close();
+$('mForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  try {
+    await api(`/maintenance/${encodeURIComponent(mEditing.name)}`, { method: 'PUT', body: JSON.stringify({
+      freq: f.freq.value, time: f.time.value, weekday: Number(f.weekday.value),
+      mday: f.mday.value === 'last' ? 'last' : Number(f.mday.value),
+      update: f.update.checked, busy_wait: Number(f.busy_wait.value || 0) }) });
+    $('mDlg').close();
+    refreshMaint();
+  } catch (err) { $('mErr').textContent = err.message; }
+});
+
+/* ---------- diagnostics ---------- */
+let diag = null;
+function renderDiag() {
+  const f = $('setForm'), d = diag;
+  if (!d) return;
+  f.diag_debug.checked = !!(d.debug_until || d.debug_forced);
+  f.diag_debug.disabled = !!d.debug_forced;
+  $('diagDebugHint').innerHTML = d.debug_forced
+    ? 'On permanently because <code>LOG_LEVEL=DEBUG</code> is set in docker-compose.yml.'
+    : d.debug_until
+      ? `<span style="color:var(--warn)">On until ${esc(fmtWhen(d.debug_until))}</span>, then it switches itself off. Reproduce the problem now, then download the report.`
+      : 'Records each request decision, Docker event and CPU sample, to help track down a problem. Switches itself off after 24 hours.';
+  const probs = d.problems || [];
+  $('diagProblems').innerHTML = probs.length
+    ? '<div class="warnc">Recent warnings and errors</div>' + probs.map(p =>
+        `<div style="margin-top:4px"><span style="color:var(--muted)">${esc(fmtWhen(p.at))}</span> ${esc(p.message)}</div>`).join('')
+    : '<span class="ok">No warnings or errors since Stowaway started.</span>';
+  $('diagVersion').textContent = d.summary + (d.log_bytes ? ` · log files ${Math.max(1, Math.round(d.log_bytes / 1024))} KB` : '');
+}
+async function loadDiag() {
+  try { diag = await api('/diagnostics'); renderDiag(); } catch (e) { $('diagProblems').textContent = e.message; }
+}
+$('setForm').diag_debug.addEventListener('change', async (e) => {
+  try { diag = await api('/diagnostics/debug', { method: 'POST', body: JSON.stringify({ on: e.target.checked }) }); }
+  catch (err) { $('setErr').textContent = err.message; }
+  renderDiag();
+});
+function reportUrl(download) {
+  const q = new URLSearchParams({ private: $('setForm').diag_private.checked ? 'true' : 'false', download: download ? 'true' : 'false' });
+  return `${API}/diagnostics/report?${q}`;
+}
+$('diagView').onclick = () => window.open(reportUrl(false), '_blank', 'noopener');
+$('diagDownload').onclick = () => {
+  const a = document.createElement('a');
+  a.href = reportUrl(true); a.download = '';
+  document.body.appendChild(a); a.click(); a.remove();
+};
+$('diagIssue').onclick = () => {
+  if (!diag) return;
+  const body = ['**What happened?**', '', '', '**What did you expect to happen?**', '', '',
+    '**Steps to make it happen again**', '1. ', '', '---',
+    `${diag.summary}`, '',
+    '_Please attach the diagnostic report: Settings → Diagnostics → Download report. Look it over first; it lists your containers and home-network addresses._'].join('\n');
+  const q = new URLSearchParams({ title: '', body });
+  window.open(`${diag.issue_url}?${q}`, '_blank', 'noopener');
+};
+
+/* ---------- integrations ---------- */
+let intTab = 'homarr', intItems = [];
+const BASE = location.origin + location.pathname.replace(/\/$/, '');
+function codeBlock(code, label) {
+  return `<div class="snipbar"><span class="hint" style="margin:0">${label || ''}</span><button type="button" class="copy" data-copy="${esc(code)}">Copy</button></div><pre class="snip">${esc(code)}</pre>`;
+}
+function intItem() { return intItems.find(i => i.name === $('intApp').value) || intItems[0]; }
+function yamlKey(n) { return /^[A-Za-z0-9_-]+$/.test(n) ? n : JSON.stringify(n); }
+function renderInt() {
+  document.querySelectorAll('#intTabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.t === intTab)));
+  $('tokSection').hidden = intTab !== 'ha';
+  const i = intItem();
+  if (!i) { $('intBody').innerHTML = '<div class="empty">Enable Stowaway on an app, or give a container a restart schedule, first.</div>'; return; }
+  const n = i.name, st = `${BASE}/status/${encodeURIComponent(n)}`, dot = `${st}?code=1`;
+  const link = i.link || `http://${host}`, wake = `${BASE}/wake/${encodeURIComponent(n)}`, api = `${BASE}/api/v1/apps/${encodeURIComponent(n)}`;
+  const slug = n.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  let h = '';
+  if (intTab === 'homarr') {
+    h = `<ol class="steps">
+      <li>Edit the <b>${esc(n)}</b> app in Homarr. Set <b>URL</b> to <code>${esc(link)}</code> and <b>Ping URL</b> to <code>${esc(dot)}</code>.<br><span class="hint">The dot is <b>green while awake</b> and <b>red while asleep</b>. Red here means asleep, not broken. Homarr checks every minute, and this never wakes the app.</span></li>
+      <li>For more detail (Homarr 1.65 or newer): <b>Manage → Custom widgets → New</b>. URL <code>${esc(st)}</code>, method GET, no authentication.
+        <ul><li><b>Status indicator</b>: JSONPath <code>$.state</code>, good values <code>running</code>.</li>
+            <li><b>Single value</b>: <code>$.summary</code> (shows e.g. "Awake · sleeps in 8 min · restart Sun 4:00 AM").</li>
+            ${i.controlled ? `<li>Optional <b>Action button</b> "Wake": POST <code>${esc(wake)}</code>, authentication <b>API key header</b> with name <code>X-Stowaway</code> and value <code>1</code>.</li>` : ''}</ul></li>
+      <li>Add the widget to your board.</li></ol>`;
+  } else if (intTab === 'homepage') {
+    const code = `- ${yamlKey(n)}:
+    href: ${link}
+    siteMonitor: ${dot}
+    description: Managed by Stowaway
+    widget:
+      type: customapi
+      url: ${st}
+      refreshInterval: 15000
+      mappings:
+        - field: state
+          label: Status
+          remap:
+            - value: running
+              to: Awake
+            - value: sleeping
+              to: Asleep
+            - value: starting
+              to: Starting
+            - any: true
+              to: Working
+        - field: maintenance.next_restart_text
+          label: Restart`;
+    h = codeBlock(code, `Add to <code>services.yaml</code> under a group. The monitor shows a red mark while ${esc(n)} is asleep.`);
+  } else if (intTab === 'dashy') {
+    const code = `- title: ${n}
+  url: ${link}
+  statusCheck: true
+  statusCheckUrl: ${dot}
+  statusCheckInterval: 60`;
+    h = codeBlock(code, 'Add to the items of a section in <code>conf.yml</code>. Green while awake, red while asleep.');
+  } else if (intTab === 'glance') {
+    const code = `- type: monitor
+  title: Apps
+  sites:
+    - title: ${n}
+      url: ${link}
+      check-url: ${dot}
+- type: custom-api
+  title: Stowaway
+  url: ${BASE}/status
+  cache: 30s
+  template: |
+    <ul class="list list-gap-10 collapsible-container" data-collapse-after="8">
+    {{ range .JSON.Array "apps" }}
+      <li><span class="color-highlight">{{ .String "name" }}</span>
+        <span class="color-subdue">{{ .String "summary" }}</span></li>
+    {{ end }}
+    </ul>`;
+    h = codeBlock(code, 'Add to a column in <code>glance.yml</code>. The second widget lists every app with its state and next restart.');
+  } else if (intTab === 'heimdall') {
+    h = `<ol class="steps">
+      <li>Add an app tile with URL <code>${esc(link)}</code>.</li>
+      <li>Heimdall has no status dot for ordinary tiles. Choose <b>Stowaway</b> as the application type to show "Awake/Asleep" and the next restart on the tile. This needs the Stowaway enhanced app; see the <code>heimdall/</code> folder in the Stowaway project for how to add it.</li>
+      <li>In the tile's config, enter the dashboard address <code>${esc(BASE.replace(/\/_stowaway$/, ''))}</code> and the app name <code>${esc(n)}</code>.</li></ol>`;
+  } else if (intTab === 'ha') {
+    const code = `# configuration.yaml: replace YOUR_TOKEN with a token from below
+rest:
+  - resource: ${api}
+    headers:
+      Authorization: Bearer YOUR_TOKEN
+    scan_interval: 30
+    sensor:
+      - name: ${n} status
+        value_template: "{{ value_json.summary }}"
+        json_attributes: [state, wake_blocked, sleeps_at, maintenance]
+
+switch:
+  - platform: rest
+    name: ${n} awake
+    resource: ${api}/power
+    state_resource: ${api}
+    body_on: '{"on": true}'
+    body_off: '{"on": false}'
+    is_on_template: "{{ value_json.state in ['running', 'starting'] }}"
+    headers:
+      Authorization: Bearer YOUR_TOKEN
+      Content-Type: application/json
+  - platform: rest
+    name: ${n} don't wake
+    resource: ${api}/block
+    state_resource: ${api}
+    body_on: '{"on": true}'
+    body_off: '{"on": false}'
+    is_on_template: "{{ value_json.wake_blocked }}"
+    headers:
+      Authorization: Bearer YOUR_TOKEN
+      Content-Type: application/json
+
+rest_command:
+  ${slug}_away:
+    url: ${api}/sleep
+    method: post
+    headers:
+      Authorization: Bearer YOUR_TOKEN
+    content_type: application/json
+    payload: '{"block": true}'
+
+# automations.yaml: switch off while nobody's home, back on when someone arrives
+- alias: ${n} off while away
+  triggers:
+    - trigger: numeric_state
+      entity_id: zone.home
+      below: 1
+      for: "00:15:00"
+  actions:
+    - action: rest_command.${slug}_away
+- alias: ${n} back on when home
+  triggers:
+    - trigger: numeric_state
+      entity_id: zone.home
+      above: 0
+  actions:
+    - action: switch.turn_off
+      target:
+        entity_id: switch.${slug}_don_t_wake`;
+    h = `<p class="hint" style="margin:0"><b>Easiest:</b> install the <b>Stowaway</b> integration from HACS, enter <code>${esc(location.host)}</code> and a token from below, and every app gets switches, sensors and buttons. <b>Without HACS</b>, paste this instead.</p>` +
+        (i.controlled ? codeBlock(code, `REST setup for ${esc(n)}. Leave out <code>{"block": true}</code> if visitors should still be able to wake it while you're away.`)
+                      : `<p class="hint" style="margin:0">${esc(n)} only has a restart schedule. Its status is at <code>${esc(api)}</code>, and <code>POST ${esc(api)}/restart</code> restarts it now.</p>`);
+  } else {
+    h = `<div class="steps" style="list-style:none;padding:0">
+      <div><b>Status (JSON)</b> · never wakes the app<br><code>${esc(st)}</code></div>
+      <div><b>Status for a dot</b> · 200 while awake, 503 while asleep<br><code>${esc(dot)}</code></div>
+      <div><b>All apps (JSON)</b><br><code>${esc(BASE)}/status</code></div>
+      <div><b>Open / wake</b><br><code>${esc(link)}</code></div>
+      <div><b>API</b> · with a token: <code>GET ${esc(api)}</code>, <code>POST …/wake</code>, <code>…/sleep</code> <code>{"block": true}</code>, <code>…/block</code> <code>{"on": true}</code>, <code>…/keep-awake</code> <code>{"minutes": 60}</code>, <code>…/restart</code></div></div>`;
+  }
+  $('intBody').innerHTML = h;
+}
+async function loadTokens() {
+  try {
+    const d = await api('/tokens');
+    $('tokList').innerHTML = d.tokens.length ? d.tokens.map(t => `<div class="tok"><b>${esc(t.name)}</b>
+      <span class="sub">${esc(t.hint)} · made ${esc(new Date(t.created * 1000).toLocaleDateString())} · ${t.last_used ? 'last used ' + esc(ago(Date.now() / 1000 - t.last_used)) : 'never used'}</span>
+      <button type="button" class="danger" data-revoke="${esc(t.id)}">Revoke</button></div>`).join('')
+      : '<p class="hint" style="margin:0">No tokens yet.</p>';
+  } catch (e) { $('intErr').textContent = e.message; }
+}
+$('intBtn').onclick = async () => {
+  $('intErr').textContent = ''; $('tokNew').innerHTML = '';
+  let maintItems = [];
+  try { await refresh(); maintItems = (await api('/maintenance')).items; } catch (e) {}
+  intItems = services.map(sv => ({ name: sv.name, controlled: true, link: linksFor(sv)[0] }))
+    .concat(maintItems.filter(m => m.schedule && !m.controlled && m.status !== 'missing').map(m => ({ name: m.name, controlled: false })));
+  const keep = $('intApp').value;
+  $('intApp').innerHTML = intItems.map(i => `<option value="${esc(i.name)}">${esc(i.name)}${i.controlled ? '' : ' (restart schedule only)'}</option>`).join('');
+  if (intItems.some(i => i.name === keep)) $('intApp').value = keep;
+  renderInt();
+  loadTokens();
+  $('intDlg').showModal();
+};
+$('intClose').onclick = () => $('intDlg').close();
+$('intApp').addEventListener('change', renderInt);
+$('intTabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-t]'); if (b) { intTab = b.dataset.t; renderInt(); } });
+$('intForm').addEventListener('click', async (e) => {
+  const c = e.target.closest('button[data-copy]');
+  if (c) {
+    try { await navigator.clipboard.writeText(c.dataset.copy); c.textContent = 'Copied'; }
+    catch { const pre = c.parentElement.nextElementSibling; getSelection().selectAllChildren(pre); c.textContent = 'Press Ctrl+C'; }
+    setTimeout(() => { c.textContent = 'Copy'; }, 1500);
+    return;
+  }
+  const r = e.target.closest('button[data-revoke]');
+  if (r) {
+    if (!confirm('Revoke this token? Anything using it (like Home Assistant) stops working until you give it a new one.')) return;
+    try { await api(`/tokens/${encodeURIComponent(r.dataset.revoke)}`, { method: 'DELETE' }); } catch (err) { $('intErr').textContent = err.message; }
+    loadTokens();
+  }
+});
+$('intForm').addEventListener('submit', (e) => e.preventDefault());
+$('tokCreate').onclick = async () => {
+  const f = $('intForm');
+  $('intErr').textContent = '';
+  try {
+    const t = await api('/tokens', { method: 'POST', body: JSON.stringify({ name: f.tokname.value.trim() || 'Home Assistant' }) });
+    f.tokname.value = '';
+    $('tokNew').innerHTML = `<div class="newtok"><b>Copy this token now. It won't be shown again.</b><code>${esc(t.token)}</code>
+      <div><button type="button" data-copy="${esc(t.token)}">Copy</button></div></div>`;
+    loadTokens();
+  } catch (err) { $('intErr').textContent = err.message; }
+};
+
+async function loadSettings() { try { settingsCache = await api('/settings'); } catch {} }
+loadSettings();
+refresh();
+refreshContainers();
+refreshSavings();
+setInterval(refreshSavings, 10000);
+setInterval(refresh, 3000);
+setInterval(refreshContainers, 10000);
+setInterval(renderServices, 1000);
+refreshMaint();
+showTab(tab);
+let mTick = 0;
+setInterval(() => { if (tab === 'maint' || ++mTick % 10 === 0) refreshMaint(); }, 3000);
+</script>
+</body>
+</html>
