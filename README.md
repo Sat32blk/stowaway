@@ -43,11 +43,14 @@ services:
     container_name: stowaway
     restart: unless-stopped
     network_mode: host
-    cap_add:
-      - NET_ADMIN
+    # Needed only for macvlan containers: uncomment cap_add/NET_ADMIN
+    # and MACVLAN_HELPER_IP (a free address on your network).
+    # cap_add:
+    #   - NET_ADMIN
     environment:
       - DASHBOARD_PORT=8880
       - TZ=America/New_York
+      # - MACVLAN_HELPER_IP=192.168.1.250
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /srv/stowaway:/config
@@ -197,16 +200,17 @@ Linux blocks a server from talking to its own macvlan (and ipvlan) containers, s
 
 Otherwise Stowaway sets up a small helper by itself; you only pick its address:
 
-1. Open **Settings** and fill in **Macvlan helper IP**: a free address on your network, outside your router's DHCP range and not used by any device or container (e.g. `192.168.1.250`). Or set it in `docker-compose.yml` with `MACVLAN_HELPER_IP=192.168.1.250`, which then takes precedence and locks the Settings field.
-2. Save. Any controlled macvlan container with a warning on its card should clear.
+1. Make sure `cap_add: - NET_ADMIN` is uncommented in `docker-compose.yml` (it's commented out by default, since only macvlan setups need it), then run `docker compose up -d`.
+2. Open **Settings** and fill in **Macvlan helper IP**: a free address on your network, outside your router's DHCP range and not used by any device or container (e.g. `192.168.1.250`). Or set it in `docker-compose.yml` with `MACVLAN_HELPER_IP=192.168.1.250`, which then takes precedence and locks the Settings field.
+3. Save. Any controlled macvlan container with a warning on its card should clear.
 
-The helper is a macvlan interface (ipvlan for ipvlan networks) named `sw-<network card>` with a route to each controlled container's IP. Stowaway sets the helper and the network card it sits on to answer ARP only for their own addresses (`arp_ignore=1`, `arp_announce=2`); without that, the helper would also answer for the server's IP, which security software such as ESET reports as ARP spoofing. It's removed when the server reboots and rebuilt when Stowaway starts. This is why Stowaway has `cap_add: NET_ADMIN` in its compose file.
+The helper is a macvlan interface (ipvlan for ipvlan networks) named `sw-<network card>` with a route to each controlled container's IP. Stowaway sets the helper and the network card it sits on to answer ARP only for their own addresses (`arp_ignore=1`, `arp_announce=2`); without that, the helper would also answer for the server's IP, which security software such as ESET reports as ARP spoofing. It's removed when the server reboots and rebuilt when Stowaway starts. This is why macvlan setups need `cap_add: NET_ADMIN` in the compose file.
 
 A macvlan app's own address (e.g. `http://192.168.1.60:8443`) keeps working while it's awake, but only the link port wakes it.
 
 ## NAS platforms
 
-Stowaway only needs standard Docker features: host networking, the `NET_ADMIN` capability, and the Docker socket. It asks Docker which API version it speaks, so it works with older engines like Synology's Docker 24 as well as Docker 29.
+Stowaway only needs standard Docker features: host networking and the Docker socket, plus the `NET_ADMIN` capability if you have macvlan containers. It asks Docker which API version it speaks, so it works with older engines like Synology's Docker 24 as well as Docker 29.
 
 | Platform | Status | Install with |
 |---|---|---|
@@ -238,7 +242,7 @@ In every case, use the ready-made image compose from [Install](#install) with th
 
 **Asustor.** Install *Docker Engine* from App Central (Intel/AMD models), then use Portainer (Stacks → Add stack) or the command line. ADM uses 8000/8001.
 
-**CasaOS / ZimaOS.** App Store → Custom Install → Import, paste the compose with e.g. `- /DATA/AppData/stowaway:/config`. After importing, check that *Network* is `host` and that `NET_ADMIN` is still listed; add them back if the importer dropped them. The dashboard uses port 80.
+**CasaOS / ZimaOS.** App Store → Custom Install → Import, paste the compose with e.g. `- /DATA/AppData/stowaway:/config`. After importing, check that *Network* is `host` (and, for macvlan containers, that `NET_ADMIN` is listed); add them back if the importer dropped them. The dashboard uses port 80.
 
 **Not supported:**
 - **Podman.** Starting and stopping probably works, but it can't check registries for new versions.

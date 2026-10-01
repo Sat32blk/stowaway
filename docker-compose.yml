@@ -8,18 +8,19 @@ services:
     # in the dashboard, and the HTTPS port if you turn HTTPS on in Settings,
     # with no port list to maintain here.
     network_mode: host
-    # NET_ADMIN = permission to change network settings on the server. Stowaway
-    # only uses it to add a small helper interface so it can reach containers on
-    # macvlan networks (Linux blocks the host from talking to them directly).
-    # Not needed if none of your apps use macvlan.
-    cap_add:
-      - NET_ADMIN
+    # Needed only for macvlan containers: uncomment these two lines AND
+    # MACVLAN_HELPER_IP below. NET_ADMIN lets Stowaway add a small helper network
+    # interface on the server so it can reach containers on macvlan networks
+    # (Linux blocks the server from talking to them directly).
+    # cap_add:
+    #   - NET_ADMIN
     environment:
       - DASHBOARD_PORT=8880                  # dashboard at http://server:8880
       - TZ=America/New_York                  # for awake hours (can also be set in Settings)
       - REAP_INTERVAL=5
-      # Free address on your network for the macvlan helper (outside your router's DHCP
-      # range, not used by anything else). Same as Settings → Macvlan; this one wins.
+      # Needed only for macvlan containers (together with cap_add NET_ADMIN above):
+      # a free address on your network for the helper, outside your router's DHCP
+      # range and not used by anything else. Overrides Settings → Macvlan.
       # - MACVLAN_HELPER_IP=192.168.1.250
       # - ALLOWED_HOSTS=nas.example.com       # extra names for the dashboard (IPs and .local/.lan names always work)
     volumes:

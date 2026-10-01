@@ -548,7 +548,7 @@ class Shim:
             mode = ["type", "macvlan", "mode", "bridge"] if kind == "macvlan" else ["type", "ipvlan", "mode", "l2"]
             rc, out = await self.ip("link", "add", name, "link", parent, *mode)
             if rc != 0:
-                hint = (" Add 'cap_add: [NET_ADMIN]' to stowaway in docker-compose.yml."
+                hint = (" Uncomment 'cap_add: - NET_ADMIN' for stowaway in docker-compose.yml, then run 'docker compose up -d'."
                         if "not permitted" in out.lower() else "")
                 raise RuntimeError(f"Couldn't create the macvlan helper: {out.rstrip('.')}.{hint}")
             self.quiet(name, parent)          # before it goes live, so it never answers for the server
