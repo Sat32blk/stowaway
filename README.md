@@ -4,9 +4,13 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/sat32blk)
 
-**Put idle Docker containers to sleep, and wake them the moment someone opens them.**
+**Stowaway is the middleman between your favorite dashboard or bookmark and your containers' web interfaces.**
 
-Stowaway starts a container when someone opens its link and puts it back to sleep once it has been idle for a set time, so apps you use now and then stop using memory and CPU the rest of the day. Everything is managed from a web dashboard: it lists every container on the server, and you tick **Enable Stowaway** on the ones it should manage.
+Plenty of containers only get used now and then: a photo editor you open once a week, a game server for the weekend, the media tools you reach for occasionally. There's no reason for them to run 24/7, using memory and CPU while nobody's looking. With Stowaway, your link still opens the app as usual. If the app is asleep, Stowaway starts it and shows a short "starting" page, then sends you straight in. Once nobody has used it for a while, Stowaway puts it back to sleep.
+
+It's also great for trying things out. Install as many containers as you like without worrying about them eating up your server's resources: the ones you're not using just sleep.
+
+Everything is managed from a web dashboard that lists every container on your server. Tick **Enable Stowaway** on the ones it should manage, and it shows you how much memory and CPU it's saving.
 
 ![Stowaway dashboard](docs/screenshots/dashboard.png)
 
