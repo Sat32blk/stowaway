@@ -552,14 +552,30 @@ class Shim:
                         if "not permitted" in out.lower() else "")
                 raise RuntimeError(f"Couldn't create the macvlan helper: {out.rstrip('.')}.{hint}")
             self.quiet(name, parent)          # before it goes live, so it never answers for the server
-            await self.ip("addr", "add", f"{shim_ip}/32", "dev", name)
-            await self.ip("link", "set", name, "up")
-            log.info("created macvlan helper %s on %s with %s", name, parent, shim_ip)
+            log.info("created macvlan helper %s on %s", name, parent)
         elif name not in self.quieted:
             self.quiet(name, parent)          # a helper made by an older version, or before a restart
+        await self.set_address(name, shim_ip)
         rc, out = await self.ip("route", "replace", f"{target}/32", "dev", name, "src", shim_ip)
         if rc != 0:
             raise RuntimeError(f"Couldn't add a route to {target}: {out}")
+
+    async def set_address(self, name: str, shim_ip: str):
+        """Make sure the helper has exactly the helper IP and is up. A helper left
+        over from an earlier run (it survives until the server reboots) may still
+        carry an old address, which makes adding routes fail with
+        "Invalid prefsrc address"."""
+        rc, out = await self.ip("-o", "-4", "addr", "show", "dev", name)
+        have = [w.split("/")[0] for line in out.splitlines() for i, w in enumerate(line.split())
+                if i and line.split()[i - 1] == "inet"]
+        if have != [shim_ip]:
+            if have:
+                log.info("macvlan helper %s had %s; changing it to %s", name, ", ".join(have), shim_ip)
+            await self.ip("addr", "flush", "dev", name)
+            rc, out = await self.ip("addr", "add", f"{shim_ip}/32", "dev", name)
+            if rc != 0:
+                raise RuntimeError(f"Couldn't give the macvlan helper the address {shim_ip}: {out}")
+        await self.ip("link", "set", name, "up")
 
     quieted: set = set()
     reported: set = set()
