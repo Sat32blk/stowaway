@@ -197,7 +197,7 @@ Linux blocks a server from talking to its own macvlan (and ipvlan) containers, s
 
 Otherwise Stowaway sets up a small helper by itself; you only pick its address:
 
-1. Open **Settings** and fill in **Macvlan helper IP**: a free address on your network, outside your router's DHCP range and not used by any device or container (e.g. `192.168.1.250`).
+1. Open **Settings** and fill in **Macvlan helper IP**: a free address on your network, outside your router's DHCP range and not used by any device or container (e.g. `192.168.1.250`). Or set it in `docker-compose.yml` with `MACVLAN_HELPER_IP=192.168.1.250`, which then takes precedence and locks the Settings field.
 2. Save. Any controlled macvlan container with a warning on its card should clear.
 
 The helper is a macvlan interface (ipvlan for ipvlan networks) named `sw-<network card>` with a route to each controlled container's IP. Stowaway sets the helper and the network card it sits on to answer ARP only for their own addresses (`arp_ignore=1`, `arp_announce=2`); without that, the helper would also answer for the server's IP, which security software such as ESET reports as ARP spoofing. It's removed when the server reboots and rebuilt when Stowaway starts. This is why Stowaway has `cap_add: NET_ADMIN` in its compose file.
@@ -348,6 +348,7 @@ Logs are also kept in `config/logs/` (up to about 3 MB, readable only by root), 
 | `STOWAWAY_DEMO` | unset | `1` runs with fake containers, no Docker needed |
 | `STOWAWAY_SELF` | `stowaway` | Stowaway's own container name, so it doesn't list itself |
 | `LOG_LEVEL` | `INFO` | `DEBUG` keeps detailed logging on permanently |
+| `MACVLAN_HELPER_IP` | empty | Address for the macvlan helper; overrides Settings → Macvlan |
 | `STATS_INTERVAL` | `15` | Seconds between CPU/network samples of awake apps (busy detection) |
 | `DOCKER_HOST` | local socket | Another way to reach Docker, e.g. `tcp://socket-proxy:2375` |
 

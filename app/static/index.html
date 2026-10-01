@@ -1122,6 +1122,7 @@ $('settingsBtn').onclick = async () => {
     $('setForm').uas.value = st.ignore_user_agents.join('\n');
     $('setForm').ips.value = st.ignore_ips.join('\n');
     $('setForm').shim.value = st.macvlan_shim_ip || '';
+    $('setForm').shim.disabled = !!st.macvlan_shim_ip_locked;
     $('setForm').style.value = st.start_page || 'loading_name';
     $('setForm').custom.value = st.start_page_custom || '';
     $('setForm').delay.value = st.ready_delay ?? 0;
@@ -1158,6 +1159,7 @@ $('settingsBtn').onclick = async () => {
       : 'No macvlan networks found on this server. ')
       + 'The server can\'t talk to its own macvlan containers directly, so Stowaway adds a small helper with this address. '
       + 'Pick a free address on your network: outside your router\'s DHCP range and not used by any device or container. '
+      + (st.macvlan_shim_ip_locked ? '<b>Set by MACVLAN_HELPER_IP in docker-compose.yml</b>; change it there. ' : '')
       + 'Not needed if the server can already reach them, for example with Unraid\'s <i>Host access to custom networks</i> or a macvlan shim you set up yourself; Stowaway uses that automatically.';
   } catch (e) { $('setErr').textContent = e.message; }
   $('setDlg').showModal();

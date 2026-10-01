@@ -833,6 +833,16 @@ def wanted_names() -> list[str]:
 
 
 reg = Registry(CONFIG_PATH)
+# MACVLAN_HELPER_IP in docker-compose.yml sets the macvlan helper address (and locks the Settings field).
+MACVLAN_HELPER_IP = os.environ.get("MACVLAN_HELPER_IP", "").strip()
+if MACVLAN_HELPER_IP:
+    try:
+        if ipaddress.ip_address(MACVLAN_HELPER_IP).version != 4:
+            raise ValueError
+        reg.settings["macvlan_shim_ip"] = MACVLAN_HELPER_IP
+    except ValueError:
+        log.error("MACVLAN_HELPER_IP=%s isn't an IPv4 address; ignoring it", MACVLAN_HELPER_IP)
+        MACVLAN_HELPER_IP = ""
 accounts = AuthStore(CONFIG_PATH.parent / "auth.json")
 api_tokens = TokenStore(CONFIG_PATH.parent / "tokens.json")
 savings = Savings(CONFIG_PATH.parent / "savings.json", lambda path, text: write_private(path, text))
@@ -2324,6 +2334,7 @@ async def get_settings():
             "duckdns_token_set": bool(reg.settings.get("duckdns_token")),
             "cloudflare_token_set": bool(reg.settings.get("cloudflare_token")),
             "timezone_effective": str(tz),
+            "macvlan_shim_ip_locked": bool(MACVLAN_HELPER_IP),
             "server_time": datetime.now(tz).strftime("%a %H:%M")}
 
 
@@ -2334,7 +2345,7 @@ async def put_settings(body: SettingsIn):
             ipaddress.ip_network(net.strip(), strict=False)
         except ValueError:
             raise HTTPException(400, f"'{net}' is not an IP address or range")
-    shim_ip = body.macvlan_shim_ip.strip()
+    shim_ip = MACVLAN_HELPER_IP or body.macvlan_shim_ip.strip()
     if shim_ip:
         try:
             if ipaddress.ip_address(shim_ip).version != 4:
