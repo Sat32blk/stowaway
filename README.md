@@ -376,7 +376,9 @@ What you should know:
 
 ## Support
 
-If Stowaway saves you some resources (or some hassle), you can [buy me a coffee](https://buymeacoffee.com/sat32blk). Thank you!
+If Stowaway saves you some resources (or some hassle), you can buy me a coffee. Thank you!
+
+<a href="https://buymeacoffee.com/sat32blk"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="60"></a>
 
 ## License
 
