@@ -1,10 +1,12 @@
 # Releasing Stowaway
 
 Repositories:
-- **https://github.com/Sat32blk/stowaway**: Stowaway itself, plus the Unraid template (`unraid/`) and the Heimdall tile (`heimdall/`).
-- **https://github.com/Sat32blk/stowaway-homeassistant**: the Home Assistant integration. It's a separate repository because HACS requires one integration per repository.
+- **https://github.com/Sat32blk/Stowaway**: Stowaway itself, plus the Unraid template (`unraid/`) and the Heimdall tile (`heimdall/`).
+- **https://github.com/Sat32blk/Stowaway-homeassistant**: the Home Assistant integration. It's a separate repository because HACS requires one integration per repository.
 
 ## Docker image
+
+Image and container names must be lowercase, so the image stays `ghcr.io/sat32blk/stowaway` even though the repository is called `Stowaway`.
 
 `.github/workflows/docker-image.yml` builds the image for amd64 and arm64 and publishes it to `ghcr.io/sat32blk/stowaway`. Watch it under the repository's **Actions** tab.
 - Every push to `main` updates `:latest`.

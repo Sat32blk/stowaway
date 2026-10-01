@@ -1,7 +1,8 @@
 # Stowaway
 
-[![Docker image](https://github.com/Sat32blk/stowaway/actions/workflows/docker-image.yml/badge.svg)](https://github.com/Sat32blk/stowaway/actions/workflows/docker-image.yml)
+[![Docker image](https://github.com/Sat32blk/Stowaway/actions/workflows/docker-image.yml/badge.svg)](https://github.com/Sat32blk/Stowaway/actions/workflows/docker-image.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/sat32blk)
 
 **Put idle Docker containers to sleep, and wake them the moment someone opens them.**
 
@@ -14,7 +15,7 @@ Stowaway starts a container when someone opens its link and puts it back to slee
 - **Resources saved:** see how much memory and CPU sleeping apps are freeing.
 - **Updates on wake:** optionally install a newer image when an app wakes, and go back to the old one if the new one won't start.
 - **Scheduled maintenance:** restart (and optionally update) any container daily, weekly or monthly.
-- **Fits your setup:** macvlan/ipvlan containers, HTTPS with Let's Encrypt, status for Homarr, Homepage, Dashy, Glance and Heimdall, and a [Home Assistant integration](https://github.com/Sat32blk/stowaway-homeassistant).
+- **Fits your setup:** macvlan/ipvlan containers, HTTPS with Let's Encrypt, status for Homarr, Homepage, Dashy, Glance and Heimdall, and a [Home Assistant integration](https://github.com/Sat32blk/Stowaway-homeassistant).
 - **Light:** about 40 MB of memory and under 0.1% of one CPU core while idle.
 
 | | |
@@ -56,7 +57,7 @@ services:
 
 ```bash
 cd /opt
-unzip stowaway.zip        # or: git clone https://github.com/Sat32blk/stowaway.git
+unzip stowaway.zip        # or: git clone https://github.com/Sat32blk/Stowaway.git stowaway
 cd stowaway
 docker compose up -d --build
 ```
@@ -372,6 +373,10 @@ What you should know:
 ## Limits in this version
 
 - **Security:** Stowaway has full control of Docker. Keep a strong password, and leave the dashboard limited to your home network unless you need it remotely.
+
+## Support
+
+If Stowaway saves you some resources (or some hassle), you can [buy me a coffee](https://buymeacoffee.com/sat32blk). Thank you!
 
 ## License
 

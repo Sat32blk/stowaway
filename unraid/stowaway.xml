@@ -4,11 +4,11 @@
 <Container version="2">
   <Name>stowaway</Name>
   <Repository>ghcr.io/sat32blk/stowaway:latest</Repository>
-  <Registry>https://github.com/Sat32blk/stowaway/pkgs/container/stowaway</Registry>
+  <Registry>https://github.com/Sat32blk/Stowaway/pkgs/container/stowaway</Registry>
   <Network>host</Network>
   <Privileged>false</Privileged>
-  <Support>https://github.com/Sat32blk/stowaway/issues</Support>
-  <Project>https://github.com/Sat32blk/stowaway</Project>
+  <Support>https://github.com/Sat32blk/Stowaway/issues</Support>
+  <Project>https://github.com/Sat32blk/Stowaway</Project>
   <Overview>Starts containers when someone opens their link and puts them back to sleep when idle. Also schedules restarts and updates. Web dashboard on port 8880.</Overview>
   <Category>Tools: Network:Management</Category>
   <WebUI>http://[IP]:8880/_stowaway</WebUI>
