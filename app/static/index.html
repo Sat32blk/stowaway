@@ -313,6 +313,12 @@ form h2::before { display: none; }
   .mrow .actions { justify-content: flex-start; }
 }
 
+/* companions */
+.complist { display: grid; gap: 6px; max-height: 220px; overflow: auto; }
+.complist .checkline { font-weight: 400; font-size: 14px; }
+.complist .checkline small { color: var(--muted); }
+.complist .group { font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 4px; }
+
 /* integrations */
 #intDlg { width: min(720px, calc(100vw - 32px)); }
 .tabs.small { margin: 0; flex-wrap: wrap; }
@@ -483,6 +489,11 @@ pre.snip { margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 12px; 
           <input name="busy_net" type="number" min="0" step="1"></label>
       </div>
       <p class="hint" id="busyHint" style="margin:0"></p>
+    </div>
+    <div class="section">
+      <h3>Companion containers</h3>
+      <p class="hint" id="compHint" style="margin:0"></p>
+      <div id="compList" class="complist"></div>
     </div>
     <div class="section">
       <h3>Awake hours</h3>
@@ -754,6 +765,7 @@ const ICON = {
 };
 function busyReason(s) {
   if (!s.stats) return 'active';
+  if (s.stats.busy_by) return s.stats.busy_by;
   const parts = [];
   if (s.stats.cpu >= s.busy_cpu_effective) parts.push(s.stats.cpu + '% CPU');
   if (s.stats.net != null && s.stats.net >= s.busy_net_effective) parts.push(fmtRate(s.stats.net));
@@ -831,12 +843,13 @@ function renderServices() {
       <div>
         <div class="name">${esc(s.name)} <span class="pill ${st}">${st === 'sleeping' && s.block_wake ? 'switched off' : st}</span></div>
         <div class="meta">${linkHtml}</div>
-        <div class="meta">app port ${s.port}${s.upstream ? ' · via ' + esc(s.upstream.replace(/^https?:\/\//, '')) : ''}${s.via_macvlan ? '<span class="tag">macvlan</span>' : ''}${updateReady(s) ? '<span class="tag ready" title="Installs the next time it wakes">update ready</span>' : ''}${s.open_mode === 'direct' ? '<span class="tag" title="Browsers are sent to the app\'s own address after waking">opens directly</span>' : ''}${s.maintenance && s.maintenance.next_restart_text ? `<span class="tag" title="${esc(s.maintenance.schedule)}">restart ${esc(s.maintenance.next_restart_text)}</span>` : ''}</div>
+        <div class="meta">app port ${s.port}${s.upstream ? ' · via ' + esc(s.upstream.replace(/^https?:\/\//, '')) : ''}${s.via_macvlan ? '<span class="tag">macvlan</span>' : ''}${(s.companions || []).length ? `<span class="tag" title="Start and sleep together with it: ${esc(s.companions.join(', '))}">+ ${s.companions.length} companion${s.companions.length > 1 ? 's' : ''}</span>` : ''}${updateReady(s) ? '<span class="tag ready" title="Installs the next time it wakes">update ready</span>' : ''}${s.open_mode === 'direct' ? '<span class="tag" title="Browsers are sent to the app\'s own address after waking">opens directly</span>' : ''}${s.maintenance && s.maintenance.next_restart_text ? `<span class="tag" title="${esc(s.maintenance.schedule)}">restart ${esc(s.maintenance.next_restart_text)}</span>` : ''}</div>
       </div>
       <div class="idle">${idle}</div>
       <div class="actions">${open}${btn}${s.forced === 'hold'
         ? `<button data-act="release" data-n="${esc(s.name)}">Release</button>`
         : `<button data-act="holdmenu" data-n="${esc(s.name)}">Keep awake</button>`}<button data-act="edit" data-n="${esc(s.name)}">Edit</button></div>
+      ${s.companion_error ? `<div class="warn">${esc(s.companion_error)}</div>` : ''}
       ${s.block_wake ? `<div class="warn">Switched off: visitors can't wake it (set from Home Assistant, the API or the Keep awake menu).<button data-act="unblock" data-n="${esc(s.name)}">Allow waking</button></div>` : ''}
       ${s.update_error ? `<div class="warn">${esc(s.update_error)}<button data-act="retryupdate" data-n="${esc(s.name)}">Try again next wake</button></div>` : ''}
       ${s.warning ? `<div class="warn">${esc(s.warning)}${/Settings/.test(s.warning) ? '<button data-act="settings">Open Settings</button>' : ''}</div>` : ''}
@@ -863,8 +876,11 @@ function renderContainers() {
   $('containers').innerHTML = rows.map(c => {
     const on = !!c.controlled_by;
     const st = c.status === 'running' ? 'running' : 'stopped';
-    return `<div class="crow ${on ? 'on' : ''}">
-      <label class="check"><input type="checkbox" data-c="${esc(c.name)}" ${on ? 'checked' : ''}> ${on ? 'Stowaway Enabled' : 'Enable Stowaway'}</label>
+    const check = c.companion_of
+      ? `<label class="check dis" title="Starts and sleeps together with ${esc(c.companion_of)}. Change this in ${esc(c.companion_of)}'s Edit window."><input type="checkbox" checked disabled> With ${esc(c.companion_of)}</label>`
+      : `<label class="check"><input type="checkbox" data-c="${esc(c.name)}" ${on ? 'checked' : ''}> ${on ? 'Stowaway Enabled' : 'Enable Stowaway'}</label>`;
+    return `<div class="crow ${on || c.companion_of ? 'on' : ''}">
+      ${check}
       <div><div class="cname">${esc(c.name)}</div>
         <div class="sub">${esc(c.image)}${c.project ? ' · ' + esc(c.project) : ''}${c.managed_by === 'truenas' ? '<span class="tag" title="Managed by TrueNAS Apps: Stowaway can start and stop it, but updates are left to TrueNAS">TrueNAS app</span>' : ''}</div></div>
       <div class="ports">${esc(portsText(c))}</div>
@@ -945,6 +961,7 @@ function openControl(c, svc) {
     f.idle.value = 10;
   }
   syncMode();
+  renderCompanions(c, svc);
   const cpuDef = settingsCache.busy_cpu ?? 5, netDef = settingsCache.busy_net ?? 50;
   f.busy_cpu.placeholder = `default ${cpuDef}`;
   f.busy_net.placeholder = `default ${netDef}`;
@@ -1029,6 +1046,7 @@ $('form').addEventListener('submit', async (e) => {
     busy_cpu: f.busy_cpu.value === '' ? null : Number(f.busy_cpu.value),
     busy_net: f.busy_net.value === '' ? null : Number(f.busy_net.value),
     awake_hours: readHours(),
+    companions: [...$('compList').querySelectorAll('input[data-comp]:checked')].map(x => x.dataset.comp),
   };
   if (body.awake_hours.some(w => !w.days.length)) { $('formErr').textContent = 'Pick at least one day for each awake-hours entry.'; return; }
   if (body.awake_hours.some(w => !w.from || !w.to || w.from === w.to)) { $('formErr').textContent = 'Each awake-hours entry needs different start and end times.'; return; }
@@ -1846,6 +1864,24 @@ $('tokCreate').onclick = async () => {
     loadTokens();
   } catch (err) { $('intErr').textContent = err.message; }
 };
+
+/* ---------- companion containers ---------- */
+function renderCompanions(c, svc) {
+  const main = c ? c.name : (svc && svc.container);
+  const chosen = new Set(svc ? svc.companions || [] : []);
+  const project = c && c.project;
+  const others = containers.filter(x => x.name !== main && !x.controlled_by &&
+    (!x.companion_of || (svc && x.companion_of === svc.name)));
+  const same = others.filter(x => project && x.project === project);
+  const rest = others.filter(x => !(project && x.project === project));
+  const row = (x) => `<label class="checkline"><input type="checkbox" data-comp="${esc(x.name)}" ${chosen.has(x.name) ? 'checked' : ''}>
+    ${esc(x.name)} <small>${esc(x.image)}</small></label>`;
+  $('compHint').innerHTML = 'Containers that only work together with this app, such as worker nodes. They start when it wakes, sleep when it sleeps, and their activity keeps it awake.' +
+    (same.length ? ` Containers from the same compose project (<b>${esc(project)}</b>) are listed first.` : '');
+  $('compList').innerHTML = (same.length ? `<div class="group">Same project: ${esc(project)}</div>` + same.map(row).join('') : '') +
+    (rest.length ? `<details${same.length ? '' : ' open'}><summary>${same.length ? 'Other containers' : 'Containers on this server'} (${rest.length})</summary>${rest.map(row).join('')}</details>` : '') ||
+    '<p class="hint" style="margin:0">No other containers available.</p>';
+}
 
 async function loadSettings() { try { settingsCache = await api('/settings'); } catch {} }
 loadSettings();

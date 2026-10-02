@@ -343,6 +343,10 @@ class DemoDriver:
             c("pihole", "pihole/pihole", "running", "", exposed=[53, 80], mode="host"),
             c("stowaway", "stowaway-stowaway", "running", "stowaway", mode="host"),
             c("broken-app", "example/broken", "exited", "", {8080: 8080}),
+            c("tdarr", "ghcr.io/haveagitgat/tdarr", "exited", "tdarr", {8265: 8265}, [8265, 8266]),
+            c("tdarr-node-cpu", "ghcr.io/haveagitgat/tdarr_node", "exited", "tdarr"),
+            c("tdarr-node-intel", "ghcr.io/haveagitgat/tdarr_node", "exited", "tdarr"),
+            c("tdarr-node-nvidia", "ghcr.io/haveagitgat/tdarr_node", "exited", "tdarr"),
         ]}
 
     async def status(self, name):
@@ -642,7 +646,9 @@ class Service:
         self.own_addrs = set()       # host:port forms of the app's own address, for fixing redirects
         self.update_info = None      # result of the last update check
         self.update_error = None
+        self.companion_error = None
         self.lock = asyncio.Lock()
+        self.comp_samples: dict = {}  # companion -> previous raw counters
         self.update(cfg)
 
     def update(self, cfg: dict):
@@ -668,6 +674,8 @@ class Service:
         self.update_checked = float(cfg.get("update_checked") or 0)
         self.update_skip = cfg.get("update_skip") or None            # version that failed; don't retry it
         self.block_wake = bool(cfg.get("block_wake", False))         # "don't wake": visitors can't start it
+        # Companion containers start and sleep together with this app (e.g. tdarr's nodes).
+        self.companions = [c for c in dict.fromkeys(cfg.get("companions") or []) if c and c != self.container]
 
     @property
     def upstream(self):
@@ -708,6 +716,8 @@ class Service:
             cfg["update_skip"] = self.update_skip
         if self.block_wake:
             cfg["block_wake"] = True
+        if self.companions:
+            cfg["companions"] = self.companions
         return cfg
 
     def to_api(self) -> dict:
@@ -730,6 +740,9 @@ class Service:
             "update_info": self.update_info,
             "update_error": self.update_error,
             "block_wake": self.block_wake,
+            "companions": self.companions,
+            "companion_error": self.companion_error,
+            "companion_status": {c: driver.cached_status(c) for c in self.companions},
             "maintenance": maint_brief(self.container),
         }
 
@@ -777,6 +790,12 @@ class Registry:
                 for svc in self.services.values():
                     if svc.link_port == port:
                         return svc
+        return None
+
+    def companion_of(self, container: str):
+        for svc in self.services.values():
+            if container in svc.companions:
+                return svc
         return None
 
     def by_container(self, container: str):
@@ -1107,9 +1126,37 @@ async def install_update(svc: Service):
     return new_id, old_id, {**info, "old_image": old_image, "new_image": new_image}
 
 
+async def start_companions(svc: Service):
+    """Start the app's companion containers. A companion that fails to start is
+    logged and shown on the card, but doesn't stop the app itself from opening."""
+    async def one(c):
+        try:
+            if await driver.status(c) != "running":
+                log.info("starting %s (companion of %s)", c, svc.name)
+                await driver.start(c)
+        except Exception as e:
+            log.error("couldn't start %s (companion of %s): %s", c, svc.name, e)
+            return f"{c}: {e}"
+    problems = [p for p in await asyncio.gather(*(one(c) for c in svc.companions)) if p]
+    svc.companion_error = "Companion didn't start: " + "; ".join(problems) if problems else None
+
+
+async def stop_companions(svc: Service):
+    async def one(c):
+        try:
+            if await driver.status(c) == "running":
+                log.info("stopping %s (companion of %s)", c, svc.name)
+                await driver.stop(c)
+        except Exception as e:
+            log.error("couldn't stop %s (companion of %s): %s", c, svc.name, e)
+    await asyncio.gather(*(one(c) for c in svc.companions))
+
+
 async def start_and_wait(svc: Service):
     svc.start_began = time.time()
     await driver.start(svc.container)
+    if svc.companions:
+        spawn(start_companions(svc))      # the app comes first; companions (e.g. worker nodes) follow
     await resolve(svc)   # container IPs only exist once it is running
     if svc.warning:
         raise RuntimeError(svc.warning)
@@ -1193,6 +1240,8 @@ async def stop_service(svc: Service):
         log.info("stopping %s", svc.container)
         svc.transition = "stopping"
         try:
+            if svc.companions:
+                await stop_companions(svc)    # workers first, then the app they depend on
             await driver.stop(svc.container)
         except Exception as e:
             svc.error = str(e)
@@ -1288,12 +1337,36 @@ async def sample_activity(svc: Service, now: float):
               now - max(svc.last_activity, svc.last_busy), svc.idle_timeout)
     cpu_t, net_t = thresholds(svc)
     busy = cpu >= cpu_t or (net is not None and net >= net_t)
+    # Companions count too: tdarr's server is quiet while its nodes transcode.
+    total_cpu, total_mem, busy_by = cpu, mem_mb, None
+    for c in svc.companions:
+        cc = await driver.stats(c)
+        if not cc:
+            svc.comp_samples.pop(c, None)
+            continue
+        cc["t"] = now
+        cp, svc.comp_samples[c] = svc.comp_samples.get(c), cc
+        if not cp or cc["t"] <= cp["t"]:
+            continue
+        ds = cc["system"] - cp["system"]
+        ccpu = max(0.0, (cc["cpu"] - cp["cpu"]) / ds * cc["ncpu"] * 100) if ds > 0 else 0.0
+        cnet = None
+        if cc["net"] is not None and cp["net"] is not None:
+            cnet = max(0.0, (cc["net"] - cp["net"]) / (cc["t"] - cp["t"]) / 1024)
+        total_cpu += ccpu
+        if cc.get("mem") is not None and total_mem is not None:
+            total_mem += cc["mem"] / 1048576
+        if ccpu >= cpu_t or (cnet is not None and cnet >= net_t):
+            busy, busy_by = True, busy_by or f"{c} ({ccpu:.0f}% CPU)"
+    if svc.companions:
+        svc.stats["cpu_total"] = round(total_cpu, 1)
+        svc.stats["busy_by"] = busy_by
     svc.busy_now = svc.busy_check and busy
     if svc.busy_now:
         svc.last_busy = now
-    # Learn what the app uses when idle: that's what sleeping it saves.
+    # Learn what the app (with its companions) uses when idle: that's what sleeping it saves.
     if not busy and svc.active == 0 and svc.running_since and now - svc.running_since > LEARN_AFTER_START:
-        savings.learn(svc.name, cpu, mem_mb)
+        savings.learn(svc.name, total_cpu, total_mem)
 
 
 def activity_api(svc: Service) -> dict:
@@ -2042,6 +2115,7 @@ class ServiceIn(BaseModel):
     busy_cpu: float | None = None
     busy_net: float | None = None
     awake_hours: list[dict] | None = None
+    companions: list[str] | None = None
 
 
 class HoldIn(BaseModel):
@@ -2106,6 +2180,22 @@ def check_activity(cpu=None, net=None, hours=None):
             raise HTTPException(400, "each awake-hours entry needs at least one day and different start and end times")
         clean.append({"days": days, "from": f"{a // 60:02d}:{a % 60:02d}", "to": f"{b // 60:02d}:{b % 60:02d}"})
     return clean
+
+
+async def check_companions(companions, container: str, exclude: str | None = None):
+    for c in companions or []:
+        if c == container:
+            raise HTTPException(400, "an app can't be its own companion")
+        if c == SELF_NAME:
+            raise HTTPException(400, "Stowaway can't be a companion")
+        owner = reg.by_container(c)
+        if owner and owner.name != exclude:
+            raise HTTPException(409, f"'{c}' is managed by Stowaway as an app of its own; disable that first")
+        other = reg.companion_of(c)
+        if other and other.name != exclude:
+            raise HTTPException(409, f"'{c}' is already a companion of '{other.name}'")
+        if await driver.status(c) == "missing":
+            raise HTTPException(404, f"no container named '{c}'")
 
 
 def check_conflicts(hosts=None, link_port=None, exclude=None):
@@ -2334,6 +2424,7 @@ async def list_containers():
             **info,
             "published": [[c, h] for c, h in sorted(info["published"].items())],
             "controlled_by": svc.name if svc else None,
+            "companion_of": (reg.companion_of(info["name"]).name if reg.companion_of(info["name"]) else None),
             "macvlan_ip": macvlan_ip(info, mv),
             "suggested_port": app_port,
             "suggested_link_port": link_port,
@@ -2450,6 +2541,9 @@ async def add_service(body: ServiceIn):
         raise HTTPException(400, "stowaway can't control itself")
     check_conflicts(body.hosts, body.link_port)
     check_page_options(body.start_page, body.ready_delay)
+    if reg.companion_of(body.container or name):
+        raise HTTPException(409, f"'{name}' is a companion of '{reg.companion_of(body.container or name).name}'; remove it there first")
+    await check_companions(body.companions, body.container or name)
     body.awake_hours = check_activity(body.busy_cpu, body.busy_net, body.awake_hours)
     svc = Service(name, body.model_dump(exclude_none=True))
     svc.status = await driver.status(svc.container)
@@ -2469,6 +2563,9 @@ async def update_service(name: str, body: ServiceIn):
     changes.pop("name", None)
     check_conflicts(changes.get("hosts"), changes.get("link_port"), exclude=name)
     check_page_options(changes.get("start_page"), changes.get("ready_delay"))
+    if changes.get("companions") is not None:
+        await check_companions(changes["companions"], svc.container, exclude=name)
+        changes["companions"] = list(dict.fromkeys(changes["companions"]))
     if changes.get("open_mode") is not None and changes["open_mode"] not in ("proxy", "direct"):
         raise HTTPException(400, "open mode must be 'proxy' or 'direct'")
     if changes.get("update_every") is not None and not 0 <= changes["update_every"] <= 720:
@@ -2495,6 +2592,8 @@ async def delete_service(name: str, start: bool = False):
     await listeners.sync()
     if start:
         spawn(driver.start(svc.container))
+        for c in svc.companions:
+            spawn(driver.start(c))
 
 
 @admin.post("/api/services/{name}/start", status_code=202)

@@ -88,6 +88,15 @@ Untick **Stowaway Enabled** to hand a container back. Stowaway offers to start i
 
 Stowaway never modifies your containers (so OMV's Compose page won't undo anything). The app's own port keeps working while it's awake; only the link port wakes it.
 
+## Companion containers
+
+Some apps come with helper containers that are useless on their own, like Tdarr and its `tdarr-node-cpu`, `tdarr-node-intel` and `tdarr-node-nvidia` nodes. Enable Stowaway on the main app only, and under **Companion containers** in its settings tick the helpers. Containers from the same compose project are listed first.
+
+- **Waking:** companions start right after the app wakes.
+- **Sleeping:** they go to sleep with it.
+- **Activity counts:** if a companion is busy (say, a node transcoding), the app stays awake even when its own web interface is idle.
+- **In the container list:** companions show **With tdarr** instead of their own *Enable Stowaway* box.
+
 ## Resources saved
 
 The top of the dashboard shows what sleeping apps save:
