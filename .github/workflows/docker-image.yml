@@ -1,5 +1,7 @@
 # Builds the Stowaway image for Intel/AMD (amd64) and ARM (arm64) and publishes it to
-# GitHub's container registry as ghcr.io/sat32blk/stowaway.
+# GitHub's container registry as ghcr.io/sat32blk/stowaway, and to Docker Hub as
+# <DOCKERHUB_USERNAME>/stowaway once the repository variable DOCKERHUB_USERNAME and
+# the secret DOCKERHUB_TOKEN are set (Settings > Secrets and variables > Actions).
 #   - every push to the main branch updates the :latest tag
 #   - pushing a tag like v1.2.0 also publishes :1.2.0 and :1.2
 name: Docker image
@@ -30,6 +32,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - if: ${{ vars.DOCKERHUB_USERNAME != '' }}
+        uses: docker/login-action@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - id: ver
         run: |
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
@@ -38,7 +46,9 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/${{ github.repository_owner }}/stowaway
+          images: |
+            ghcr.io/${{ github.repository_owner }}/stowaway
+            name=docker.io/${{ vars.DOCKERHUB_USERNAME }}/stowaway,enable=${{ vars.DOCKERHUB_USERNAME != '' }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
@@ -54,3 +64,13 @@ jobs:
           build-args: VERSION=${{ steps.ver.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Copies README.md to the Docker Hub page (only on main, once Docker Hub is set up).
+      - if: ${{ vars.DOCKERHUB_USERNAME != '' && github.ref == 'refs/heads/main' }}
+        uses: peter-evans/dockerhub-description@v4
+        continue-on-error: true
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ vars.DOCKERHUB_USERNAME }}/stowaway
+          short-description: Starts Docker containers when their link is opened and puts them to sleep when idle.
