@@ -458,18 +458,22 @@ pre.snip { margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 12px; 
 <dialog id="dlg">
   <form id="form" method="dialog">
     <h2 id="dlgTitle"></h2>
-    <label>Link port
-      <input name="link_port" type="number" min="1" max="65535" required></label>
+    <label>Put it to sleep
+      <select name="mode">
+        <option value="auto">Automatically, when nobody has used it for a while</option>
+        <option value="manual">Only when I say so (Home Assistant, the API or by hand)</option>
+      </select></label>
+    <p class="hint" id="modeHint" style="margin:0"></p>
+    <label id="idleWrap">After being idle for <small>minutes</small>
+      <input name="idle" type="number" min="1" step="1" value="10"></label>
+    <label>Link port <small id="linkOpt"></small>
+      <input name="link_port" type="number" min="1" max="65535"></label>
     <p class="hint" id="linkHint"></p>
-    <div class="row">
-      <label>App port <small>inside the container</small>
-        <input name="port" type="number" min="1" max="65535" list="portList" required></label>
-      <label>Stop after idle <small>minutes, 0 = never</small>
-        <input name="idle" type="number" min="0" step="1" value="10"></label>
-    </div>
+    <label>App port <small>inside the container</small>
+      <input name="port" type="number" min="1" max="65535" list="portList" required></label>
     <datalist id="portList"></datalist>
     <p class="hint" id="portHint"></p>
-    <div class="section">
+    <div class="section" id="busySection">
       <h3>Stay awake while busy</h3>
       <label class="checkline"><input type="checkbox" name="busy_check"> Don't put it to sleep while it's busy</label>
       <div class="row" id="busyRow">
@@ -805,11 +809,11 @@ function renderServices() {
       const left = s.idle_timeout - idleFor, pct = Math.max(0, Math.min(100, left / s.idle_timeout * 100));
       idle = `<div class="label">Sleeps in <b>${fmtDur(left)}</b></div><div class="bar ${pct < 20 ? 'low' : ''}"><i style="width:${pct}%"></i></div>`;
     } else if (st === 'running') {
-      idle = `<div class="label">Auto-sleep <b>off</b></div>`;
+      idle = `<div class="label">Sleeps <b>when told</b></div>`;
     } else {
       idle = `<div class="label">Last used <b>${ago(usedAgo)}</b></div>` +
         (s.next_awake ? `<div class="label"><span class="state" style="font-weight:400;color:var(--muted)">${ICON.clock} Wakes</span><b>${fmtWhen(s.next_awake)}</b></div>`
-                      : `<div class="label">Sleeps after <b>${s.idle_timeout ? fmtDur(s.idle_timeout) : 'never'}</b></div>`);
+                      : `<div class="label">Sleeps after <b>${s.idle_timeout ? fmtDur(s.idle_timeout) : 'when told'}</b></div>`);
     }
     if (st === 'running' && s.stats) {
       idle += `<div class="stats"><span>CPU <b>${s.stats.cpu}%</b></span>${s.stats.net != null ? `<span>Net <b>${fmtRate(s.stats.net)}</b></span>` : ''}</div>`;
@@ -821,7 +825,7 @@ function renderServices() {
     const links = linksFor(s);
     const linkHtml = links.length
       ? links.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">${u.startsWith('https:') ? LOCK : ''}${esc(u.replace(/^https?:\/\//, ''))}</a>`).join(', ')
-      : 'no link set';
+      : 'no link · woken from Home Assistant or here';
     const open = links.length ? `<a class="btn" href="${esc(links[0])}" target="_blank" rel="noopener">Open</a>` : '';
     return `<div class="card">
       <div>
@@ -899,6 +903,8 @@ function httpsFor(name) {
   return `https://${label}.${st.https_domain}${Number(st.https_port) === 443 ? '' : ':' + st.https_port}`;
 }
 function linkHint(c, linkPort) {
+  if (!linkPort && $('form').mode.value === 'manual')
+    return 'No link port: it can only be woken from Home Assistant, the API or this dashboard, not by opening a link.';
   const url = `http://${host}:${linkPort || '…'}`;
   let t = `You'll open it at <b>${esc(url)}</b>. Use that link in Heimdall, Homarr or a bookmark.`;
   const hs = c && httpsFor(c.name);
@@ -926,7 +932,8 @@ function openControl(c, svc) {
   if (svc) {
     f.link_port.value = svc.link_port || '';
     f.port.value = svc.port;
-    f.idle.value = Math.round(svc.idle_timeout / 60 * 100) / 100;
+    f.mode.value = svc.idle_timeout > 0 ? 'auto' : 'manual';
+    f.idle.value = svc.idle_timeout > 0 ? Math.round(svc.idle_timeout / 60 * 100) / 100 : 10;
     f.hosts.value = svc.hosts.join(', ');
     f.upstream.value = svc.custom_upstream || '';
     f.style.value = svc.start_page || '';
@@ -934,8 +941,10 @@ function openControl(c, svc) {
   } else {
     f.link_port.value = c.suggested_link_port || '';
     f.port.value = c.suggested_port || 80;
+    f.mode.value = 'auto';
     f.idle.value = 10;
   }
+  syncMode();
   const cpuDef = settingsCache.busy_cpu ?? 5, netDef = settingsCache.busy_net ?? 50;
   f.busy_cpu.placeholder = `default ${cpuDef}`;
   f.busy_net.placeholder = `default ${netDef}`;
@@ -960,6 +969,15 @@ function openControl(c, svc) {
   $('linkHint').innerHTML = linkHint(c, f.link_port.value);
   f.link_port.oninput = () => { $('linkHint').innerHTML = linkHint(c, f.link_port.value); };
   $('dlg').showModal();
+}
+function syncMode() {
+  const f = $('form'), manual = f.mode.value === 'manual';
+  $('idleWrap').hidden = manual;
+  $('busySection').hidden = manual;          // only matters for sleeping when idle
+  $('linkOpt').textContent = manual ? 'optional' : '';
+  $('modeHint').innerHTML = manual
+    ? 'Stowaway never puts it to sleep by itself. Home Assistant (for example when nobody is home), the API, scheduled maintenance or the <b>Sleep now</b> button decide. Opening its link still wakes it, unless it has been switched off with <i>don\'t wake</i>.'
+    : 'It sleeps once nobody has used it, and it hasn\'t been busy, for the time below. Home Assistant and the API can still wake it or put it to sleep at any time.';
 }
 
 $('containers').addEventListener('change', async (e) => {
@@ -999,7 +1017,7 @@ $('form').addEventListener('submit', async (e) => {
   const body = {
     link_port: Number(f.link_port.value) || null,
     port: Number(f.port.value) || 80,
-    idle_timeout: Math.round(Number(f.idle.value || 0) * 60),
+    idle_timeout: f.mode.value === 'manual' ? 0 : Math.max(60, Math.round(Number(f.idle.value || 10) * 60)),
     hosts: f.hosts.value.split(',').map(h => h.trim()).filter(Boolean),
     upstream: f.upstream.value.trim() || null,
     start_page: f.style.value || null,
@@ -1112,6 +1130,7 @@ function readHours() {
 }
 function syncBusyRow() { $('busyRow').style.opacity = $('form').busy_check.checked ? 1 : .45; }
 $('form').busy_check.addEventListener('change', syncBusyRow);
+$('form').mode.addEventListener('change', () => { syncMode(); $('linkHint').innerHTML = linkHint(adding || containers.find(x => editing && x.name === editing.container), $('form').link_port.value); });
 
 /* ---------- settings ---------- */
 $('settingsBtn').onclick = async () => {

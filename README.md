@@ -81,7 +81,7 @@ Keep the container named `stowaway` (so it doesn't list itself as an app), or se
 2. Check the suggested ports and click **Enable Stowaway**. The checkbox then reads **Stowaway Enabled**:
    - **Link port** is the new address that wakes the app, e.g. `http://192.168.1.2:18096`. Put this in Heimdall, Homarr or a bookmark.
    - **App port** is the port the app listens on inside its container. It's filled in from the container's settings.
-   - **Stop after idle** is how many minutes without visits before it goes to sleep.
+   - **Put it to sleep** *automatically* after a number of idle minutes, or *only when I say so* (Home Assistant, the API or by hand).
 3. The app now appears under **Controlled by Stowaway** with a countdown to sleep, plus Open, Wake, Sleep now and Edit buttons.
 
 Untick **Stowaway Enabled** to hand a container back. Stowaway offers to start it if it's asleep so it runs normally again.
@@ -276,6 +276,8 @@ Containers that only have a restart schedule (Maintenance tab) can be shown too:
 If a dashboard pings the app's link directly instead, add its user agent (e.g. `Homarr`) or IP address under **Settings → Dashboard status checks**. Those requests never wake an app or reset its timer.
 
 ## Home Assistant
+
+**Apps only Home Assistant should control.** When enabling an app, set **Put it to sleep** to *Only when I say so*. Stowaway then never puts it to sleep by itself: Home Assistant (for example when nobody is home), the API, scheduled maintenance or **Sleep now** decide. The link port is optional in this mode; without one, the app is woken from Home Assistant or the dashboard rather than by opening a link.
 
 The **Stowaway** integration for Home Assistant lives in its own repository (`stowaway-homeassistant`), installed through HACS. Each app gets:
 - an **Awake** switch;
