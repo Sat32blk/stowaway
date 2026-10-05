@@ -1666,13 +1666,22 @@ function codeBlock(code, label) {
 }
 function intItem() { return intItems.find(i => i.name === $('intApp').value) || intItems[0]; }
 function yamlKey(n) { return /^[A-Za-z0-9_-]+$/.test(n) ? n : JSON.stringify(n); }
+const DASH_MATCH = { homarr: /homarr/, homepage: /gethomepage|homepage/, dashy: /dashy/, glance: /glance/,
+  heimdall: /heimdall/, ha: /home-?assistant|hass/ };
+function dashOnMacvlan(tab) {
+  const re = DASH_MATCH[tab];
+  return re && containers.find(c => c.macvlan_ip && (re.test(c.name.toLowerCase()) || re.test((c.image || '').toLowerCase())));
+}
 function renderInt() {
   document.querySelectorAll('#intTabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.t === intTab)));
   $('tokSection').hidden = intTab !== 'ha';
   const i = intItem();
   if (!i) { $('intBody').innerHTML = '<div class="empty">Enable Stowaway on an app, or give a container a restart schedule, first.</div>'; return; }
-  const n = i.name, st = `${BASE}/status/${encodeURIComponent(n)}`, dot = `${st}?code=1`;
-  const link = i.link || `http://${host}`, wake = `${BASE}/wake/${encodeURIComponent(n)}`, api = `${BASE}/api/v1/apps/${encodeURIComponent(n)}`;
+  // A dashboard on a macvlan network can't reach the server's own address, only the helper's.
+  const dashC = dashOnMacvlan(intTab), shimIp = settingsCache.macvlan_shim_ip;
+  const SB = dashC && shimIp ? BASE.replace(location.hostname, shimIp) : BASE;
+  const n = i.name, st = `${SB}/status/${encodeURIComponent(n)}`, dot = `${st}?code=1`;
+  const link = i.link || `http://${host}`, wake = `${SB}/wake/${encodeURIComponent(n)}`, api = `${SB}/api/v1/apps/${encodeURIComponent(n)}`;
   const slug = n.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
   let h = '';
   if (intTab === 'homarr') {
@@ -1723,7 +1732,7 @@ function renderInt() {
       check-url: ${dot}
 - type: custom-api
   title: Stowaway
-  url: ${BASE}/status
+  url: ${SB}/status
   cache: 30s
   template: |
     <ul class="list list-gap-10 collapsible-container" data-collapse-after="8">
@@ -1737,7 +1746,7 @@ function renderInt() {
     h = `<ol class="steps">
       <li>Add an app tile with URL <code>${esc(link)}</code>.</li>
       <li>Heimdall has no status dot for ordinary tiles. Choose <b>Stowaway</b> as the application type to show "Awake/Asleep" and the next restart on the tile. This needs the Stowaway enhanced app; see the <code>heimdall/</code> folder in the Stowaway project for how to add it.</li>
-      <li>In the tile's config, enter the dashboard address <code>${esc(BASE.replace(/\/_stowaway$/, ''))}</code> and the app name <code>${esc(n)}</code>.</li></ol>`;
+      <li>In the tile's config, enter the dashboard address <code>${esc(SB.replace(/\/_stowaway$/, ''))}</code> and the app name <code>${esc(n)}</code>.</li></ol>`;
   } else if (intTab === 'ha') {
     const code = `# configuration.yaml: replace YOUR_TOKEN with a token from below
 rest:
@@ -1809,6 +1818,12 @@ rest_command:
       <div><b>All apps (JSON)</b><br><code>${esc(BASE)}/status</code></div>
       <div><b>Open / wake</b><br><code>${esc(link)}</code></div>
       <div><b>API</b> · with a token: <code>GET ${esc(api)}</code>, <code>POST …/wake</code>, <code>…/sleep</code> <code>{"block": true}</code>, <code>…/block</code> <code>{"on": true}</code>, <code>…/keep-awake</code> <code>{"minutes": 60}</code>, <code>…/restart</code></div></div>`;
+  }
+  if (dashC) {
+    const who = esc(dashC.name);
+    h = (shimIp
+      ? `<p class="hint" style="margin:0"><b>${who}</b> is on a macvlan network (${esc(dashC.macvlan_ip)}), so it can't reach this server at its usual address. The addresses it checks below use the macvlan helper <b>${esc(shimIp)}</b> instead. Links you click still use the usual address.</p>`
+      : `<div class="warn"><b>${who}</b> is on a macvlan network (${esc(dashC.macvlan_ip)}), so it can't reach this server at its usual address. Set a <b>Macvlan helper IP</b> in Settings (and NET_ADMIN in docker-compose.yml); its status checks then go through that address.</div>`) + h;
   }
   $('intBody').innerHTML = h;
 }

@@ -598,9 +598,12 @@ class Shim:
         self.quieted.add(name)
         log.info("ARP answers limited to own addresses on %s and %s", name, parent)
 
+    generation = 0
+
     async def reset(self):
         """Remove helper interfaces (e.g. after the helper IP changed)."""
         self.quieted.clear()
+        self.generation += 1
         if DEMO:
             return
         rc, out = await self.ip("-o", "link", "show")
@@ -1898,6 +1901,53 @@ async def maintenance_loop():
         maint_wake.clear()
 
 
+async def macvlan_peers_loop():
+    """Give every running macvlan/ipvlan container a way back to the server.
+
+    The helper interface only helps if the server's replies go out through it.
+    Apps Stowaway manages get a route when they're resolved; this adds one for
+    every other container on those networks too, so e.g. a dashboard like Homarr
+    on macvlan can reach Stowaway (and the server) at the helper IP. Only runs
+    once a helper IP is set. Routes are cheap and harmless if left behind: the
+    helper reaches ordinary devices on the network just as well."""
+    routed: dict[str, float] = {}     # container IP -> when its route was last checked
+    failed: set[str] = set()          # error messages already logged
+    gen = shim.generation
+    while True:
+        await asyncio.sleep(30)
+        if DEMO or not reg.settings.get("macvlan_shim_ip"):
+            continue
+        if shim.generation != gen:    # helper was rebuilt: its routes are gone
+            gen = shim.generation
+            routed.clear()
+        try:
+            mv = await driver.macvlans()
+            if not mv:
+                continue
+            now = time.time()
+            for c in await driver.list():
+                if c["status"] != "running":
+                    continue
+                for n in c["nets"]:
+                    net = mv.get(n["name"])
+                    if not net or not n["ip"] or now - routed.get(n["ip"], 0) < 600:
+                        continue
+                    try:
+                        await shim.ensure(net["parent"], n["ip"], net["driver"])
+                        routed[n["ip"]] = now
+                        log.debug("route to %s (%s) goes through the macvlan helper", c["name"], n["ip"])
+                    except Exception as e:
+                        if str(e) not in failed:
+                            failed.add(str(e))
+                            log.warning("couldn't give %s a route through the macvlan helper: %s", c["name"], e)
+        except asyncio.CancelledError:
+            raise
+        except (httpx.TransportError, OSError):
+            pass
+        except Exception:
+            log.exception("macvlan route check failed")
+
+
 _started = False
 
 
@@ -1921,9 +1971,11 @@ async def startup():
     app.state.http = httpx.AsyncClient(timeout=httpx.Timeout(None, connect=5), follow_redirects=False)
     app.state.reaper = asyncio.create_task(reaper())
     app.state.maintenance = asyncio.create_task(maintenance_loop())
+    app.state.peers = asyncio.create_task(macvlan_peers_loop())
 
 
 async def shutdown():
+    app.state.peers.cancel()
     app.state.reaper.cancel()
     app.state.maintenance.cancel()
     app.state.watch.cancel()
