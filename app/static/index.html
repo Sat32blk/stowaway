@@ -619,7 +619,7 @@ pre.snip { margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 12px; 
       <h3>Dashboard status checks</h3>
       <p class="hint" style="margin:0">Requests matching these are treated as status checks from Heimdall, Homarr and similar: they never wake a sleeping container and never reset its idle timer.</p>
       <label>Ignore user agents <small>one per line; matches if the text appears anywhere</small>
-        <textarea name="uas" placeholder="Homarr"></textarea></label>
+        <textarea name="uas" placeholder="undici"></textarea></label>
       <label>Ignore IP addresses <small>one per line; single IPs or ranges like 172.18.0.0/16</small>
         <textarea name="ips" placeholder="192.168.1.60"></textarea></label>
       <p class="hint" style="margin:0">A tile's status URL can also be <code id="statusEx"></code>, which always answers without waking anything.</p>
@@ -1677,7 +1677,7 @@ function renderInt() {
   let h = '';
   if (intTab === 'homarr') {
     h = `<ol class="steps">
-      <li>Edit the <b>${esc(n)}</b> app in Homarr. Set <b>URL</b> to <code>${esc(link)}</code> and <b>Ping URL</b> to <code>${esc(dot)}</code>.<br><span class="hint">The dot is <b>green while awake</b> and <b>red while asleep</b>. Red here means asleep, not broken. Homarr checks every minute, and this never wakes the app.</span></li>
+      <li>Edit the <b>${esc(n)}</b> app in Homarr. Set <b>URL</b> to <code>${esc(link)}</code> and <b>Ping URL</b> to <code>${esc(dot)}</code>.<br><span class="hint">The dot is <b>green while awake</b> and <b>red while asleep</b>. Red here means asleep, not broken. Homarr checks every minute, and this never wakes the app. Don't leave Ping URL empty: Homarr would then check the app's own link, which wakes it every minute and keeps it awake.</span></li>
       <li>For more detail (Homarr 1.65 or newer): <b>Manage → Custom widgets → New</b>. URL <code>${esc(st)}</code>, method GET, no authentication.
         <ul><li><b>Status indicator</b>: JSONPath <code>$.state</code>, good values <code>running</code>.</li>
             <li><b>Single value</b>: <code>$.summary</code> (shows e.g. "Awake · sleeps in 8 min · restart Sun 4:00 AM").</li>
