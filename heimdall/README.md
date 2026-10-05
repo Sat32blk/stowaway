@@ -17,16 +17,18 @@ Once it's part of Heimdall's app list:
 
 Alternatively, put the Stowaway dashboard address (`http://192.168.1.2:8880`) in the config URL and the app's name in **App name**. This also works for containers that only have a restart schedule.
 
-## Adding it before it's in Heimdall's list
+## Adding it to Heimdall
 
-These steps assume the linuxserver Heimdall container is named `heimdall`.
+**The easy way:** in the Stowaway dashboard, open **Integrations → Heimdall** and click **Add the Stowaway tile to heimdall**. Stowaway copies the files into Heimdall and registers the tile. This works with the linuxserver Heimdall image, which keeps the tile on its `/config` volume, so it stays through Heimdall updates. Reload Heimdall in your browser afterwards.
+
+**By hand:** these steps assume the linuxserver Heimdall container is named `heimdall`.
 
 ```bash
 docker cp heimdall/Stowaway heimdall:/app/www/app/SupportedApps/Stowaway
 docker exec heimdall php /app/www/artisan register:app Stowaway
 ```
 
-A Heimdall update may remove a manually copied app. If so, repeat the two commands.
+With the linuxserver image the tile is stored under Heimdall's `/config`, so it survives updates. If it ever disappears, repeat the two commands (or click the button again).
 
 ## Submitting it to Heimdall
 

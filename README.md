@@ -278,7 +278,7 @@ Use each app's link port as the tile's URL; clicking it wakes the app. Click **I
 - **Homepage:** `siteMonitor` with the `?code=1` address, plus a `customapi` widget showing the state and next restart.
 - **Dashy:** `statusCheckUrl` with the `?code=1` address.
 - **Glance:** a `monitor` widget with `check-url`, and a `custom-api` widget listing every app.
-- **Heimdall:** has no status dot for ordinary tiles. The `heimdall/` folder has a **Stowaway** enhanced app that shows the status and next restart on the tile; see `heimdall/README.md`.
+- **Heimdall:** has no status dot for ordinary tiles. The **Stowaway** tile type shows the status and next restart instead. Add it to Heimdall with one click under **Integrations → Heimdall** (linuxserver image), or by hand; see `heimdall/README.md`.
 
 **Dashboard on a macvlan network?** It can't reach the server's own address, so its status checks fail ("fetch failed"). Use the macvlan helper IP instead, e.g. `http://192.168.1.60:8880/_stowaway/status/<app>?code=1`. Stowaway gives every container on a macvlan network a route through the helper once a helper IP is set, and the Integrations window fills in the helper address for you when it sees your dashboard on macvlan. Tile links you click keep using the usual address.
 

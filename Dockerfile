@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends iproute2 && rm 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
+COPY heimdall/Stowaway ./heimdall/Stowaway
 RUN python -m compileall -q app
 # Shown in Settings → Diagnostics; set by the GitHub build from the release tag.
 ARG VERSION=""

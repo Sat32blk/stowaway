@@ -214,6 +214,26 @@ class Docker:
         return self.stream_json("POST", "/images/create", params={"fromImage": repo, "tag": tag},
                                 headers={"X-Registry-Auth": auth} if auth else None)
 
+    # ---- files and commands inside a container ----
+    async def put_archive(self, name: str, path: str, tar_bytes: bytes):
+        """Unpack a tar archive into a directory inside the container."""
+        if self.api_version is None:
+            await self.negotiate()
+        r = await self.http.put(self._url(f"/containers/{quote(name, safe='')}/archive"),
+                                params={"path": path}, content=tar_bytes,
+                                headers={"Content-Type": "application/x-tar"})
+        self._raise(r)
+
+    async def exec_run(self, name: str, cmd: "list[str]", user: str = "", timeout: float = 120):
+        """Run a command in a running container. Returns (exit code, output)."""
+        ex = await self.request("POST", f"/containers/{quote(name, safe='')}/exec", json_body={
+            "Cmd": cmd, "User": user, "AttachStdout": True, "AttachStderr": True, "Tty": True})
+        r = await self.request("POST", f"/exec/{ex['Id']}/start", json_body={"Detach": False, "Tty": True},
+                               timeout=timeout, raw=True)
+        out = r.content.decode("utf-8", "replace")
+        info = await self.request("GET", f"/exec/{ex['Id']}/json")
+        return info.get("ExitCode"), out
+
     # ---- networks and events ----
     async def networks(self):
         return await self.request("GET", "/networks")

@@ -1672,6 +1672,30 @@ function dashOnMacvlan(tab) {
   const re = DASH_MATCH[tab];
   return re && containers.find(c => c.macvlan_ip && (re.test(c.name.toLowerCase()) || re.test((c.image || '').toLowerCase())));
 }
+async function loadHeimdall() {
+  const box = $('hmInstall');
+  if (!box) return;
+  let r;
+  try { r = await api('/heimdall'); } catch (e) { box.innerHTML = `<span class="hint">${esc(e.message)}</span>`; return; }
+  if (!$('hmInstall')) return;
+  const manual = 'see <code>heimdall/README.md</code> in the Stowaway project to add it by hand';
+  if (!r.containers.length) { box.innerHTML = `<span class="hint">No Heimdall container found on this server; ${manual}.</span>`; return; }
+  box.innerHTML = r.containers.map(c => `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button type="button" data-hm="${esc(c.name)}" ${c.running ? '' : 'disabled'}>Add the Stowaway tile to ${esc(c.name)}</button>
+      <span class="hint" data-hm-msg="${esc(c.name)}">${c.running ? '' : 'Start it first.'}</span></div>`).join('');
+}
+$('intBody').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-hm]');
+  if (!b) return;
+  const name = b.dataset.hm, msg = document.querySelector(`[data-hm-msg="${CSS.escape(name)}"]`);
+  b.disabled = true; msg.textContent = 'Adding…';
+  try {
+    const r = await api('/heimdall/install', { method: 'POST', body: JSON.stringify({ container: name }) });
+    msg.innerHTML = `<b>${esc(r.message)}</b> Reload Heimdall in your browser.`;
+    b.textContent = 'Add again (update)';
+  } catch (err) { msg.textContent = err.message; }
+  b.disabled = false;
+});
 function renderInt() {
   document.querySelectorAll('#intTabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.t === intTab)));
   $('tokSection').hidden = intTab !== 'ha';
@@ -1745,7 +1769,9 @@ function renderInt() {
   } else if (intTab === 'heimdall') {
     h = `<ol class="steps">
       <li>Add an app tile with URL <code>${esc(link)}</code>.</li>
-      <li>Heimdall has no status dot for ordinary tiles. Choose <b>Stowaway</b> as the application type to show "Awake/Asleep" and the next restart on the tile. This needs the Stowaway enhanced app; see the <code>heimdall/</code> folder in the Stowaway project for how to add it.</li>
+      <li>Heimdall has no status dot for ordinary tiles; the <b>Stowaway</b> tile type shows "Awake/Asleep" and the next restart instead. Add it to Heimdall (once; it stays through Heimdall updates):
+        <div id="hmInstall" style="margin-top:6px"><span class="hint">Looking for Heimdall…</span></div></li>
+      <li>Edit the tile and choose <b>Stowaway</b> as the application type.</li>
       <li>In the tile's config, enter the dashboard address <code>${esc(SB.replace(/\/_stowaway$/, ''))}</code> and the app name <code>${esc(n)}</code>.</li></ol>`;
   } else if (intTab === 'ha') {
     const code = `# configuration.yaml: replace YOUR_TOKEN with a token from below
@@ -1826,6 +1852,7 @@ rest_command:
       : `<div class="warn"><b>${who}</b> is on a macvlan network (${esc(dashC.macvlan_ip)}), so it can't reach this server at its usual address. Set a <b>Macvlan helper IP</b> in Settings (and NET_ADMIN in docker-compose.yml); its status checks then go through that address.</div>`) + h;
   }
   $('intBody').innerHTML = h;
+  if (intTab === 'heimdall') loadHeimdall();
 }
 async function loadTokens() {
   try {

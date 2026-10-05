@@ -22,6 +22,7 @@ import secrets
 import signal
 import socket
 import sys
+import tarfile
 import time
 import zipfile
 from datetime import datetime, timedelta, timezone
@@ -2877,6 +2878,70 @@ async def revoke_token(token_id: str):
     if not api_tokens.revoke(token_id):
         raise HTTPException(404, "no such token")
     log.info("API token %s revoked", token_id)
+
+
+# ---- Heimdall: install the Stowaway tile ("enhanced app") into a Heimdall container ----
+HEIMDALL_APP = Path(__file__).resolve().parent.parent / "heimdall" / "Stowaway"
+
+
+async def heimdall_containers() -> list[dict]:
+    if DEMO:
+        return [{"name": "heimdall", "running": True}]
+    return [{"name": c["name"], "running": c["status"] == "running"}
+            for c in await driver.list() if "heimdall" in (c["image"] or "").lower()]
+
+
+class HeimdallIn(BaseModel):
+    container: str
+
+
+@admin.get("/api/heimdall")
+async def heimdall_list():
+    return {"containers": await heimdall_containers(), "available": HEIMDALL_APP.is_dir() or DEMO}
+
+
+@admin.post("/api/heimdall/install")
+async def heimdall_install(body: HeimdallIn):
+    """Copy the Stowaway tile into Heimdall's app folder and register it. In the
+    linuxserver image that folder is on Heimdall's /config volume, so it stays
+    through Heimdall updates; Heimdall's app-list sync leaves local apps alone."""
+    found = {c["name"]: c for c in await heimdall_containers()}
+    c = found.get(body.container)
+    if not c:
+        raise HTTPException(404, f"{body.container} isn't a Heimdall container")
+    if not c["running"]:
+        raise HTTPException(409, f"Start {body.container} first; the tile can only be installed while Heimdall runs.")
+    if DEMO:
+        return {"ok": True, "message": "Installed (demo)."}
+    if not HEIMDALL_APP.is_dir():
+        raise HTTPException(500, "This copy of Stowaway doesn't include the Heimdall tile files.")
+    dk = driver.dk
+    code, out = await dk.exec_run(body.container, ["sh", "-c", "readlink -f /app/www/app/SupportedApps && test -f /app/www/artisan"])
+    if code != 0:
+        raise HTTPException(400, f"{body.container} doesn't look like the linuxserver Heimdall image, so the tile "
+                                 "can't be added automatically. See heimdall/README.md in the Stowaway project "
+                                 "for adding it by hand.")
+    apps_dir = out.strip().splitlines()[0].strip()
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w") as tar:
+        tar.add(str(HEIMDALL_APP), arcname="Stowaway",
+                filter=lambda ti: None if ti.name.endswith((".md", "__pycache__")) else ti)
+    await dk.put_archive(body.container, apps_dir, buf.getvalue())
+    # Heimdall runs as user "abc"; it needs to own its files. Harmless if that user doesn't exist.
+    await dk.exec_run(body.container, ["sh", "-c", f"chown -R abc:abc '{apps_dir}/Stowaway' 2>/dev/null || true"])
+    code, out = await dk.exec_run(body.container, ["php", "/app/www/artisan", "register:app", "Stowaway"], user="abc")
+    if code != 0 and "already registered" not in out:
+        code, out = await dk.exec_run(body.container, ["php", "/app/www/artisan", "register:app", "Stowaway"])
+    if code != 0 and "already registered" not in out:
+        log.warning("Heimdall tile install in %s: %s", body.container, out.strip()[-500:])
+        raise HTTPException(500, f"Heimdall couldn't register the tile: {out.strip()[-300:] or 'no details'}")
+    updated = "already registered" in out
+    if updated:
+        # PHP caches compiled code and doesn't look for changes; restart it so the new files are used.
+        await dk.exec_run(body.container, ["sh", "-c", "s6-svc -r /run/service/svc-php-fpm 2>/dev/null || true"])
+    log.info("Stowaway tile %s in Heimdall (%s)", "updated" if updated else "installed", body.container)
+    return {"ok": True, "updated": updated,
+            "message": "Updated the Stowaway tile in Heimdall." if updated else "Added the Stowaway tile to Heimdall."}
 
 
 # ---- v1 API: stable endpoints for Home Assistant and other automation ----
