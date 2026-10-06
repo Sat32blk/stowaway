@@ -51,7 +51,8 @@ from app.savings import LEARN_AFTER_START, Savings, host_info
 from app.certs import SOURCES as CERT_SOURCES, DOMAIN_RE, CertManager, dns_label, local_ips
 
 CONFIG_PATH = Path(os.environ.get("STOWAWAY_CONFIG", "config.yaml"))
-diagnostics.setup(CONFIG_PATH.parent, lambda: [reg.settings.get(k) for k in ("duckdns_token", "cloudflare_token")]
+SECRET_SETTINGS = ("duckdns_token", "cloudflare_token", "homarr_key")   # never sent to the browser or into reports
+diagnostics.setup(CONFIG_PATH.parent, lambda: [reg.settings.get(k) for k in SECRET_SETTINGS]
                   if "reg" in globals() else [])
 log = logging.getLogger("stowaway")
 DEMO = os.environ.get("STOWAWAY_DEMO") == "1"
@@ -763,7 +764,7 @@ class Registry:
                          "https_enabled": False, "https_port": 8443, "https_domain": "",
                          "cert_source": "selfsigned", "le_email": "", "le_staging": False,
                          "duckdns_token": "", "cloudflare_token": "", "http_challenge_port": 8480,
-                         "admin_lan_only": True}
+                         "admin_lan_only": True, "homarr_url": "", "homarr_key": ""}
         self.load()
 
     def load(self):
@@ -2197,6 +2198,8 @@ class SettingsIn(BaseModel):
     cloudflare_token: str | None = None
     http_challenge_port: int = 8480
     admin_lan_only: bool = True
+    homarr_url: str = ""
+    homarr_key: str | None = None          # None or "" keeps the saved key
 
 
 def get_svc(name: str) -> Service:
@@ -2490,10 +2493,11 @@ async def list_containers():
 async def get_settings():
     mv = await driver.macvlans()
     tz = local_tz()
-    public = {k: v for k, v in reg.settings.items() if k not in ("duckdns_token", "cloudflare_token")}
+    public = {k: v for k, v in reg.settings.items() if k not in SECRET_SETTINGS}
     return {**public, "macvlan_networks": [{"name": k, **v} for k, v in mv.items()],
             "duckdns_token_set": bool(reg.settings.get("duckdns_token")),
             "cloudflare_token_set": bool(reg.settings.get("cloudflare_token")),
+            "homarr_key_set": bool(reg.settings.get("homarr_key")),
             "timezone_effective": str(tz),
             "macvlan_shim_ip_locked": bool(MACVLAN_HELPER_IP),
             "server_time": datetime.now(tz).strftime("%a %H:%M")}
@@ -2546,6 +2550,15 @@ async def put_settings(body: SettingsIn):
     for label, tok in (("DuckDNS token", body.duckdns_token), ("Cloudflare token", body.cloudflare_token)):
         if tok and not re.fullmatch(r"[A-Za-z0-9._-]{8,200}", tok.strip()):
             raise HTTPException(400, f"that {label} doesn't look right; copy it again without spaces")
+    homarr_url = body.homarr_url.strip().rstrip("/")
+    homarr_key = "".join((body.homarr_key or "").split())
+    try:
+        if homarr_url:
+            homarr_url = dashsetup.check_url(homarr_url, "Homarr's address")
+        if homarr_key:
+            dashsetup.check_homarr_key(homarr_key)
+    except dashsetup.SetupError as e:
+        raise HTTPException(400, str(e))
     old = dict(reg.settings)
     changed = shim_ip != reg.settings.get("macvlan_shim_ip", "")
     reg.settings = {
@@ -2568,6 +2581,9 @@ async def put_settings(body: SettingsIn):
         "cloudflare_token": body.cloudflare_token.strip() if body.cloudflare_token else old.get("cloudflare_token", ""),
         "http_challenge_port": body.http_challenge_port,
         "admin_lan_only": body.admin_lan_only,
+        # Clearing Homarr's address forgets its key too.
+        "homarr_url": homarr_url,
+        "homarr_key": (homarr_key or old.get("homarr_key", "")) if homarr_url else "",
         "debug_until": old.get("debug_until", 0),
     }
     https_keys = ("https_enabled", "https_port", "https_domain", "cert_source", "le_email", "le_staging",
@@ -2950,8 +2966,6 @@ async def dash_info(kind: str):
     if kind not in DASH_IMAGES:
         raise HTTPException(404)
     out = {"containers": await dash_containers(kind)}
-    if kind == "homarr":
-        out["url"] = reg.settings.get("homarr_url", "")
     if kind == "glance" and not DEMO:
         for c in out["containers"]:
             if c["running"]:
@@ -3028,91 +3042,94 @@ async def dash_glance(body: GlanceIn):
     return {"ok": True, "included": included, "message": msg}
 
 
-class HomarrIn(BaseModel):
-    url: str
-    key: str
-    apps: list[DashApp] = []
+DEMO_HOMARR = [{"id": "a1", "name": "Jellyfin", "href": "http://192.168.1.2:8096", "pingUrl": None,
+                "iconUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/jellyfin.svg", "description": None}]
 
 
-class HomarrItem(BaseModel):
+class HomarrTestIn(BaseModel):
+    url: str = ""
+    key: str = ""
+
+
+def homarr_conn(url: str = "", key: str = ""):
+    """Homarr's address and key: the ones given, or the ones saved in Settings."""
+    url = url.strip() or reg.settings.get("homarr_url", "")
+    key = "".join((key or "").split()) or reg.settings.get("homarr_key", "")
+    if not url or not key:
+        raise HTTPException(409, "Set Homarr's address and API key in Settings first.")
+    try:
+        return dashsetup.check_url(url, "Homarr's address"), key
+    except dashsetup.SetupError as e:
+        raise HTTPException(400, str(e))
+
+
+async def homarr_apps(url: str, key: str) -> list[dict]:
+    if DEMO:
+        return [dict(a) for a in DEMO_HOMARR]
+    try:
+        return await dashsetup.homarr_call("GET", url, key, "/api/apps")
+    except dashsetup.SetupError as e:
+        raise HTTPException(400, str(e))
+
+
+@admin.post("/api/homarr/test")
+async def homarr_test(body: HomarrTestIn):
+    """Check Homarr's address and key (the typed ones, or the saved ones)."""
+    url, key = homarr_conn(body.url, body.key)
+    apps = await homarr_apps(url, key)
+    return {"ok": True, "message": f"Connected to Homarr; it has {len(apps)} app(s)."}
+
+
+@admin.get("/api/homarr/app/{name}")
+async def homarr_app(name: str, link: str = ""):
+    """Whether Homarr already has this app (matched by link, address and port, or name)."""
+    svc = get_svc(name)
+    if not reg.settings.get("homarr_url") or not reg.settings.get("homarr_key"):
+        return {"configured": False}
+    url, key = homarr_conn()
+    apps = await homarr_apps(url, key)
+    mid = dashsetup.homarr_match(apps, svc.name, link) if link else None
+    match = next(({k: a.get(k) for k in ("id", "name", "href", "pingUrl")} for a in apps if a["id"] == mid), None)
+    return {"configured": True, "url": url, "match": match}
+
+
+class HomarrAddIn(BaseModel):
     name: str
     link: str
-    target: str            # a Homarr app id, or "new"
-
-
-class HomarrApplyIn(BaseModel):
-    url: str
-    key: str
     base: str
-    items: list[HomarrItem]
 
 
-DEMO_HOMARR = [{"id": "a1", "name": "Jellyfin", "href": "http://192.168.1.2:8096", "pingUrl": None,
-                "iconUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/jellyfin.svg"},
-               {"id": "a2", "name": "Grafana", "href": "http://192.168.1.2:3000", "pingUrl": None,
-                "iconUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/grafana.svg"}]
-
-
-@admin.post("/api/dash/homarr/apps")
-async def dash_homarr_apps(body: HomarrIn):
-    """Homarr's apps, with a suggested match for each Stowaway app."""
-    try:
-        url = dashsetup.check_url(body.url, "Homarr's address")
-        apps = DEMO_HOMARR if DEMO else await dashsetup.homarr_call("GET", url, body.key, "/api/apps")
-    except dashsetup.SetupError as e:
-        raise HTTPException(400, str(e))
-    if reg.settings.get("homarr_url") != url:
-        reg.settings["homarr_url"] = url
-        reg.save()
-    taken, matches = set(), {}
-    for a in body.apps:
-        a = a if isinstance(a, dict) else a.model_dump()
-        mid = dashsetup.homarr_match([x for x in apps if x["id"] not in taken], a["name"], a["link"])
-        matches[a["name"]] = mid or "new"
-        if mid:
-            taken.add(mid)
-    return {"apps": [{k: x.get(k) for k in ("id", "name", "href", "pingUrl")} for x in apps], "matches": matches}
-
-
-@admin.post("/api/dash/homarr/apply")
-async def dash_homarr_apply(body: HomarrApplyIn):
-    """Set the Ping URL on the chosen Homarr apps, or create new ones. Name, icon
-    and description of existing apps are kept; the link is set to Stowaway's."""
+@admin.post("/api/homarr/add")
+async def homarr_add(body: HomarrAddIn):
+    """Put one app in Homarr: update the matching Homarr app (its name, icon and
+    description are kept; link and Ping URL are set), or add it as a new app."""
+    (item,) = await dash_items([{"name": body.name, "link": body.link}])
     base = dash_base(body.base)
-    items = await dash_items([{"name": i.name, "link": i.link} for i in body.items if i.target != "skip"])
-    target = {i.name: i.target for i in body.items}
+    url, key = homarr_conn()
+    apps = await homarr_apps(url, key)
+    _, dot = dashsetup.status_urls(base, item["name"])
+    mid = dashsetup.homarr_match(apps, item["name"], item["link"])
+    a = next((x for x in apps if x["id"] == mid), None)
     try:
-        url = dashsetup.check_url(body.url, "Homarr's address")
-        apps = DEMO_HOMARR if DEMO else await dashsetup.homarr_call("GET", url, body.key, "/api/apps")
-        by_id = {a["id"]: a for a in apps}
-        done = []
-        for it in items:
-            _, dot = dashsetup.status_urls(base, it["name"])
-            t = target[it["name"]]
-            if t == "new":
-                payload = {"name": it["name"][:64], "description": "Wakes when opened · managed by Stowaway",
-                           "iconUrl": f"https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/{it['icon']}.svg",
-                           "href": it["link"], "pingUrl": dot}
-                if not DEMO:
-                    await dashsetup.homarr_call("POST", url, body.key, "/api/apps", payload)
-                done.append(f"added {it['name']}")
-            else:
-                a = by_id.get(t)
-                if not a:
-                    raise dashsetup.SetupError(f"The Homarr app chosen for {it['name']} no longer exists; load the list again.")
-                payload = {"id": a["id"], "name": a["name"], "description": a.get("description"),
-                           "iconUrl": a.get("iconUrl") or "", "href": it["link"], "pingUrl": dot}
-                if not DEMO:
-                    await dashsetup.homarr_call("PATCH", url, body.key, f"/api/apps/{quote(a['id'], safe='')}", payload)
-                done.append(f"updated {a['name']}")
+        if a:
+            payload = {"id": a["id"], "name": a["name"], "description": a.get("description"),
+                       "iconUrl": a.get("iconUrl") or "", "href": item["link"], "pingUrl": dot}
+            if not DEMO:
+                await dashsetup.homarr_call("PATCH", url, key, f"/api/apps/{quote(a['id'], safe='')}", payload)
+            msg = (f"Updated “{a['name']}” in Homarr: it now opens {item['name']} through Stowaway "
+                   "and its status dot shows whether it's awake.")
+        else:
+            payload = {"name": item["name"][:64], "description": "Wakes when opened · managed by Stowaway",
+                       "iconUrl": f"https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/{item['icon']}.svg",
+                       "href": item["link"], "pingUrl": dot}
+            if not DEMO:
+                await dashsetup.homarr_call("POST", url, key, "/api/apps", payload)
+            msg = (f"Added {item['name']} to Homarr's apps. To show it, edit a board and add an App widget "
+                   f"with {item['name']}; turn on its status option for the dot.")
     except dashsetup.SetupError as e:
         raise HTTPException(400, str(e))
-    log.info("Homarr at %s: %s", url, ", ".join(done))
-    new = sum(1 for d in done if d.startswith("added"))
-    msg = f"Done: {', '.join(done)}."
-    if new:
-        msg += " New apps are in Homarr's app list; add them to a board with an App widget."
-    return {"ok": True, "message": msg}
+    log.info("Homarr: %s", msg)
+    return {"ok": True, "updated": bool(a), "message": msg}
 
 
 # ---- Heimdall: install the Stowaway tile ("enhanced app") into a Heimdall container ----
@@ -3405,7 +3422,7 @@ async def build_report(private: bool = True) -> str:
         w(f"Event stream: {'connected' if driver.events_live else 'NOT connected (status is looked up each time)'}")
 
     section("Settings")
-    hidden = {"duckdns_token", "cloudflare_token"}
+    hidden = set(SECRET_SETTINGS)
     for k, val in sorted(reg.settings.items()):
         if k in hidden:
             val = "(set)" if val else "(not set)"

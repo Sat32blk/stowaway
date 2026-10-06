@@ -174,11 +174,16 @@ def env_of(attrs: dict) -> dict:
 
 
 # ------------------------------------------------------------------ Homarr --
-async def homarr_call(method: str, url: str, key: str, path: str, body=None):
+def check_homarr_key(key: str) -> str:
     key = "".join((key or "").split())          # copied keys sometimes pick up spaces or line breaks
-    if key.count(".") != 1:
+    if key.count(".") != 1 or not all(key.split(".")):
         raise SetupError("That doesn't look like a Homarr API key: it should be two parts joined by a dot, "
                          "like 1a2b3c4d.Xy… Copy it again from Homarr (it's only shown once, right after creating it).")
+    return key
+
+
+async def homarr_call(method: str, url: str, key: str, path: str, body=None):
+    key = check_homarr_key(key)
     headers = {"ApiKey": key, "Accept": "application/json"}
     try:
         async with httpx.AsyncClient(timeout=15, verify=False) as c:
