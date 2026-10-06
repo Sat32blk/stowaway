@@ -19,7 +19,9 @@ Everything is managed from a web dashboard that lists every container on your se
 - **Resources saved:** see how much memory and CPU sleeping apps are freeing.
 - **Updates on wake:** optionally install a newer image when an app wakes, and go back to the old one if the new one won't start.
 - **Scheduled maintenance:** restart (and optionally update) any container daily, weekly or monthly.
-- **Fits your setup:** macvlan/ipvlan containers, HTTPS with Let's Encrypt, status for Homarr, Homepage, Dashy, Glance and Heimdall, and a [Home Assistant integration](https://github.com/Sat32blk/Stowaway-homeassistant).
+- **Companion containers:** helpers like Tdarr's nodes wake and sleep with their app.
+- **Status on your dashboard:** awake/asleep dots and next restart for Homarr, Homepage, Dashy, Glance and Heimdall. Stowaway can set up Homarr, Homepage, Glance and Heimdall for you with one click, including dashboards on macvlan.
+- **Fits your setup:** macvlan/ipvlan containers, HTTPS with Let's Encrypt, and a [Home Assistant integration](https://github.com/Sat32blk/Stowaway-homeassistant).
 - **Light:** about 40 MB of memory and under 0.1% of one CPU core while idle.
 
 | | |
@@ -217,7 +219,7 @@ Otherwise Stowaway sets up a small helper by itself; you only pick its address:
 2. Open **Settings** and fill in **Macvlan helper IP**: a free address on your network, outside your router's DHCP range and not used by any device or container (e.g. `192.168.1.250`). Or set it in `docker-compose.yml` with `MACVLAN_HELPER_IP=192.168.1.250`, which then takes precedence and locks the Settings field.
 3. Save. Any controlled macvlan container with a warning on its card should clear.
 
-The helper is a macvlan interface (ipvlan for ipvlan networks) named `sw-<network card>` with a route to each controlled container's IP. Stowaway sets the helper and the network card it sits on to answer ARP only for their own addresses (`arp_ignore=1`, `arp_announce=2`); without that, the helper would also answer for the server's IP, which security software such as ESET reports as ARP spoofing. It's removed when the server reboots and rebuilt when Stowaway starts. This is why macvlan setups need `cap_add: NET_ADMIN` in the compose file.
+The helper is a macvlan interface (ipvlan for ipvlan networks) named `sw-<network card>` with a route to each running macvlan container's IP. That includes containers Stowaway doesn't manage, so a dashboard on macvlan (Homarr, Homepage…) can reach Stowaway at the helper address for its status checks. Stowaway sets the helper and the network card it sits on to answer ARP only for their own addresses (`arp_ignore=1`, `arp_announce=2`); without that, the helper would also answer for the server's IP, which security software such as ESET reports as ARP spoofing. It's removed when the server reboots and rebuilt when Stowaway starts. This is why macvlan setups need `cap_add: NET_ADMIN` in the compose file.
 
 A macvlan app's own address (e.g. `http://192.168.1.60:8443`) keeps working while it's awake, but only the link port wakes it.
 
