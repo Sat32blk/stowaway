@@ -2897,6 +2897,78 @@ async def revoke_token(token_id: str):
     log.info("API token %s revoked", token_id)
 
 
+class HeimdallTileIn(BaseModel):
+    container: str
+    name: str
+    link: str
+    base: str
+
+
+@admin.post("/api/heimdall/tile")
+async def heimdall_tile(body: HeimdallTileIn):
+    """Create or update this app's Heimdall tile: Stowaway tile type, the app's own
+    icon, its Stowaway link and status switched on. An existing tile for the app
+    keeps its title and any icon you gave it."""
+    (item,) = await dash_items([{"name": body.name, "link": body.link}])
+    dashboard = dash_base(body.base)
+    dashboard = re.sub(r"/_stowaway$", "", dashboard)
+    found = {c["name"]: c for c in await heimdall_containers()}
+    c = found.get(body.container)
+    if not c:
+        raise HTTPException(404, f"{body.container} isn't a Heimdall container")
+    if not c["running"]:
+        raise HTTPException(409, f"Start {body.container} first.")
+    if DEMO:
+        return {"ok": True, "message": f"Added {item['name']} to Heimdall with its own icon (demo)."}
+    dk = driver.dk
+    apps_dir, icons_dir = await heimdall_paths(body.container)
+    # The app's own icon, from the dashboard-icons collection.
+    icon_note, icon_value = "", ""
+    got = await dashsetup.fetch_icon([item["icon"], re.sub(r"[^a-z0-9-]+", "-", item["name"].lower()).strip("-")])
+    if got:
+        data, ext, slug = got
+        fname = f"stowaway-{slug}.{ext}"
+        await dk.put_archive(body.container, icons_dir, dashsetup.tar_one(f"{icons_dir}/{fname}", data, None))
+        await dk.exec_run(body.container, ["sh", "-c", f"chown abc:abc '{icons_dir}/{fname}' 2>/dev/null || true"])
+        icon_value = f"icons/{fname}"
+    else:
+        icon_note = (f" Couldn't find an icon for {item['name']} in the dashboard-icons collection, so it shows "
+                     "the Stowaway icon; upload the app's icon in the tile to change it.")
+    params = {"name": item["name"], "title": item["name"][:1].upper() + item["name"][1:], "link": item["link"],
+              "dashboard": dashboard, "icon": icon_value}
+    script, pfile = f"{apps_dir}/Stowaway/.stowaway-tile.php", f"{apps_dir}/Stowaway/.stowaway-tile.json"
+
+    async def run():
+        if not (await dk.exec_run(body.container, ["test", "-f", f"{apps_dir}/Stowaway/app.json"]))[0] == 0:
+            return {"result": "not_registered"}
+        await dk.put_archive(body.container, f"{apps_dir}/Stowaway", dashsetup.tar_one(script, HEIMDALL_TILE_PHP.encode(), None))
+        await dk.put_archive(body.container, f"{apps_dir}/Stowaway", dashsetup.tar_one(pfile, json.dumps(params).encode(), None))
+        code, out = await dk.exec_run(body.container, ["php", script, pfile], user="abc")
+        await dk.exec_run(body.container, ["rm", "-f", script, pfile])
+        line = next((l for l in reversed(out.splitlines()) if l.strip().startswith("{")), "")
+        try:
+            return json.loads(line)
+        except ValueError:
+            log.warning("Heimdall tile for %s: %s", item["name"], out.strip()[-500:])
+            raise HTTPException(500, f"Heimdall couldn't save the tile: {out.strip()[-300:] or 'no details'}")
+
+    r = await run()
+    if r.get("result") == "not_registered":
+        await heimdall_install(HeimdallIn({"container": body.container}))      # first time: add the tile type
+        r = await run()
+    if r.get("result") == "created":
+        msg = f"Added a {r['title']} tile to Heimdall"
+    elif r.get("result") == "updated":
+        msg = f"Updated your {r['title']} tile in Heimdall"
+        if r.get("kept_icon"):
+            icon_note = " Its icon was kept."
+    else:
+        raise HTTPException(500, "Heimdall didn't say whether the tile was saved.")
+    msg += f": it opens {item['name']} through Stowaway and shows whether it's awake." + icon_note
+    log.info("%s", msg)
+    return {"ok": True, "message": msg}
+
+
 # ---- Dashboards: write Stowaway's status into Homarr, Homepage and Glance (only on request) ----
 DASH_IMAGES = {"homarr": "homarr", "homepage": "homepage", "glance": "glance"}
 
@@ -3175,6 +3247,83 @@ async def heimdall_containers() -> list[dict]:
         return [{"name": "heimdall", "running": True}]
     return [{"name": c["name"], "running": c["status"] == "running"}
             for c in await driver.list() if "heimdall" in (c["image"] or "").lower()]
+
+
+HEIMDALL_TILE_PHP = r"""<?php
+// Creates or updates the Heimdall tile for one Stowaway app. Parameters come from
+// the JSON file named on the command line. Prints one JSON line with the result.
+require '/app/www/vendor/autoload.php';
+$app = require '/app/www/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$p = json_decode(file_get_contents($argv[1]));
+$details = json_decode(file_get_contents(app_path('SupportedApps/Stowaway/app.json')));
+$application = App\Application::find($details->appid);
+if (!$application) {
+    echo json_encode(['result' => 'not_registered']), "\n";
+    exit(0);
+}
+$items = App\Item::withoutGlobalScope('user_id')->where('type', 0)->orderBy('id')->get();
+$find = function ($test) use ($items) {
+    foreach ($items as $i) {
+        if ($test($i)) {
+            return $i;
+        }
+    }
+    return null;
+};
+// The tile for this app: a Stowaway tile already set up for it, else a tile that
+// opens its Stowaway link, else a tile with the app's name (e.g. your old Dozzle tile).
+$item = $find(function ($i) use ($p, $details) {
+    if ($i->appid !== $details->appid) {
+        return false;
+    }
+    $c = json_decode($i->description ?: '{}');
+    return isset($c->app) && strcasecmp((string) $c->app, $p->name) === 0;
+}) ?? $find(fn ($i) => rtrim((string) $i->url, '/') === rtrim($p->link, '/'))
+   ?? $find(fn ($i) => strcasecmp(trim((string) $i->title), $p->name) === 0);
+$config = json_encode(['enabled' => '1', 'override_url' => $p->dashboard, 'app' => $p->name, 'dataonly' => '1']);
+$generic = fn ($icon) => !$icon || strpos($icon, 'stowaway.svg') !== false;
+if ($item) {
+    $keep = !$generic($item->icon);
+    $item->update([
+        'url' => $p->link,
+        'appid' => $details->appid,
+        'class' => $application->class,
+        'description' => $config,
+        'icon' => $keep ? $item->icon : ($p->icon ?: $application->icon),
+    ]);
+    echo json_encode(['result' => 'updated', 'title' => $item->title, 'kept_icon' => $keep]), "\n";
+} else {
+    $user = App\User::where('public_front', true)->first() ?? App\User::orderBy('id')->first();
+    $item = App\Item::create([
+        'title' => $p->title,
+        'url' => $p->link,
+        'colour' => '#161b1f',
+        'icon' => $p->icon ?: $application->icon,
+        'description' => $config,
+        'pinned' => 1,
+        'order' => 0,
+        'type' => 0,
+        'class' => $application->class,
+        'appid' => $details->appid,
+        'user_id' => $user ? $user->id : 0,
+    ]);
+    $item->parents()->sync([0]);
+    echo json_encode(['result' => 'created', 'title' => $item->title]), "\n";
+}
+"""
+
+
+async def heimdall_paths(container: str) -> tuple[str, str]:
+    """Heimdall's app folder and icon folder (following its links into /config)."""
+    code, out = await driver.dk.exec_run(container, ["sh", "-c",
+        "test -f /app/www/artisan && readlink -f /app/www/app/SupportedApps"
+        " && mkdir -p /app/www/storage/app/public/icons && readlink -f /app/www/storage/app/public/icons"])
+    lines = [l.strip() for l in out.splitlines() if l.strip()]
+    if code != 0 or len(lines) < 2:
+        raise HTTPException(400, f"{container} doesn't look like the linuxserver Heimdall image, so this can't be "
+                                 "done automatically. See heimdall/README.md in the Stowaway project for doing it by hand.")
+    return lines[0], lines[1]
 
 
 class HeimdallIn(BaseModel):

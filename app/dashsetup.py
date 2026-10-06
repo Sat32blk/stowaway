@@ -173,6 +173,44 @@ def env_of(attrs: dict) -> dict:
     return dict(e.split("=", 1) for e in (attrs.get("Config") or {}).get("Env") or [] if "=" in e)
 
 
+# ------------------------------------------------------------------- icons --
+ICON_SOURCES = ("https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons",
+                "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main")
+
+
+def _icon_ok(data: bytes, ext: str) -> bool:
+    if not data or len(data) > 1_000_000:
+        return False
+    if ext == "png":
+        return data.startswith(b"\x89PNG")
+    low = data.lower()
+    head = low[:512].lstrip()
+    return (b"<svg" in head or head.startswith(b"<?xml")) and b"<script" not in low and b"javascript:" not in low
+
+
+async def fetch_icon(slugs: list[str]):
+    """The app's icon from the dashboard-icons collection: (bytes, extension, slug),
+    or None if it isn't there or can't be downloaded."""
+    async with httpx.AsyncClient(timeout=10, follow_redirects=True) as c:
+        for base in ICON_SOURCES:
+            reachable = False
+            for slug in dict.fromkeys(s for s in slugs if s):
+                for ext in ("svg", "png"):
+                    try:
+                        r = await c.get(f"{base}/{ext}/{slug}.{ext}")
+                    except httpx.HTTPError:
+                        break
+                    reachable = True
+                    if r.status_code == 200 and _icon_ok(r.content, ext):
+                        return r.content, ext, slug
+                else:
+                    continue
+                break
+            if reachable:
+                return None                 # the collection was reachable and doesn't have it
+    return None
+
+
 # ------------------------------------------------------------------ Homarr --
 def check_homarr_key(key: str) -> str:
     key = "".join((key or "").split())          # copied keys sometimes pick up spaces or line breaks

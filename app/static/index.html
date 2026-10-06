@@ -1799,12 +1799,43 @@ $('homarrTest').onclick = async () => {
     msg.textContent = r.message + (f.homarr_key.value.trim() || f.homarr_url.value.trim() !== (settingsCache.homarr_url || '') ? ' Click Save to keep it.' : '');
   } catch (e) { msg.textContent = e.message; }
 };
+async function loadHeimdallTile(r) {
+  const box = $('hmTile'), i = intItem();
+  if (!box) return;
+  let h = '<h3>Add to Heimdall</h3>';
+  if (!i || !i.controlled || !i.link) {
+    box.innerHTML = h + `<span class="hint">${i && i.controlled ? `${esc(i.name)} has no link to open it with. Give it a link port (Edit) first.` : 'Pick an app Stowaway puts to sleep.'}</span>`;
+    return;
+  }
+  const running = r.containers.filter(c => c.running);
+  if (!running.length) {
+    box.innerHTML = h + `<span class="hint">${r.containers.length ? `Start ${esc(r.containers[0].name)} first.` : 'No running Heimdall container found on this server.'} You can still set it up by hand below.</span>`;
+    return;
+  }
+  h += `<p class="hint" style="margin:0">Creates a tile for ${esc(i.name)} with its own icon and Awake/Asleep status, opening it through Stowaway. If Heimdall already has a ${esc(i.name)} tile, that one is changed instead and keeps its title and icon.</p>`;
+  if (running.length > 1) h += `<label>Heimdall container <select id="hmCont">${running.map(c => `<option>${esc(c.name)}</option>`).join('')}</select></label>`;
+  else h += `<input type="hidden" id="hmCont" value="${esc(running[0].name)}">`;
+  h += `<div><button type="button" class="primary" id="hmAdd">Add ${esc(i.name)} to Heimdall</button></div><div id="hmMsg" class="hint" style="margin:0"></div>`;
+  box.innerHTML = h;
+}
+$('intBody').addEventListener('click', async (e) => {
+  const b = e.target.closest('#hmAdd');
+  if (!b) return;
+  const i = intItem(), msg = $('hmMsg');
+  b.disabled = true; msg.textContent = 'Working… (the first time also adds the Stowaway tile type to Heimdall)';
+  try {
+    const r = await api('/heimdall/tile', { method: 'POST', body: JSON.stringify({ container: $('hmCont').value, name: i.name, link: i.link, base: intSB }) });
+    msg.innerHTML = `<b>${esc(r.message)}</b> Reload Heimdall to see it.`;
+  } catch (err) { msg.textContent = err.message; }
+  b.disabled = false;
+});
 async function loadHeimdall() {
   const box = $('hmInstall');
   if (!box) return;
   let r;
   try { r = await api('/heimdall'); } catch (e) { box.innerHTML = `<span class="hint">${esc(e.message)}</span>`; return; }
   if (!$('hmInstall')) return;
+  loadHeimdallTile(r);
   const manual = 'see <code>heimdall/README.md</code> in the Stowaway project to add it by hand';
   if (!r.containers.length) { box.innerHTML = `<span class="hint">No Heimdall container found on this server; ${manual}.</span>`; return; }
   box.innerHTML = r.containers.map(c => `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1895,12 +1926,13 @@ function renderInt() {
     </ul>`;
     h = codeBlock(code, 'Add to a column in <code>glance.yml</code>. The second widget lists every app with its state and next restart.');
   } else if (intTab === 'heimdall') {
-    h = `<ol class="steps">
+    h = `<div class="section" id="hmTile" style="border-top:0;padding-top:0"><h3>Add to Heimdall</h3><span class="hint">Looking for Heimdall…</span></div>
+      <div class="section"><h3>Or by hand</h3><ol class="steps">
       <li>Heimdall has no status dot for ordinary tiles; the <b>Stowaway</b> tile type shows "Awake/Asleep" and the next restart instead. Add it to Heimdall (once; it stays through Heimdall updates):
         <div id="hmInstall" style="margin-top:6px"><span class="hint">Looking for Heimdall…</span></div></li>
       <li>In Heimdall, add or edit the tile: choose <b>Stowaway</b> as the application type, then set <b>Title</b> to <code>${esc(n)}</code> (otherwise it's called "Stowaway") and <b>URL</b> to <code>${esc(link)}</code>.</li>
       <li>Under <b>Config</b>, switch <b>Enable</b> on (without it the tile shows no status), enter <code>${esc(SB.replace(/\/_stowaway$/, ''))}</code> as the URL and <code>${esc(n)}</code> as the App name, and click <b>Test</b>. Save.</li>
-      <li>The tile shows the Stowaway icon. To use the app's own icon instead, upload it in the tile's icon field.</li></ol>`;
+      <li>The tile shows the Stowaway icon. To use the app's own icon instead, upload it in the tile's icon field.</li></ol></div>`;
   } else if (intTab === 'ha') {
     const code = `# configuration.yaml: replace YOUR_TOKEN with a token from below
 rest:

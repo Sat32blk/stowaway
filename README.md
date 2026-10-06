@@ -280,7 +280,7 @@ Use each app's link port as the tile's URL; clicking it wakes the app. Click **I
 - **Homepage:** `siteMonitor` with the `?code=1` address, plus a `customapi` widget showing the state and next restart.
 - **Dashy:** `statusCheckUrl` with the `?code=1` address.
 - **Glance:** a `monitor` widget with `check-url`, and a `custom-api` widget listing every app.
-- **Heimdall:** has no status dot for ordinary tiles. The **Stowaway** tile type shows the status and next restart instead. Add it to Heimdall with one click under **Integrations → Heimdall** (linuxserver image), or by hand; see `heimdall/README.md`.
+- **Heimdall:** has no status dot for ordinary tiles. The **Stowaway** tile type shows Awake/Asleep and the next restart instead. In **Integrations → Heimdall**, **Add *app* to Heimdall** creates the tile with the app's own icon (from the [dashboard-icons](https://github.com/homarr-labs/dashboard-icons) collection), its Stowaway link and the status switched on; if you already have a tile for the app, that one is converted and keeps its title and icon. Works with the linuxserver Heimdall image; by hand, see `heimdall/README.md`.
 
 **Let Stowaway set it up.** Nothing changes in a dashboard until you click its button in the Integrations window.
 
