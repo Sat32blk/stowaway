@@ -280,6 +280,12 @@ Use each app's link port as the tile's URL; clicking it wakes the app. Click **I
 - **Glance:** a `monitor` widget with `check-url`, and a `custom-api` widget listing every app.
 - **Heimdall:** has no status dot for ordinary tiles. The **Stowaway** tile type shows the status and next restart instead. Add it to Heimdall with one click under **Integrations → Heimdall** (linuxserver image), or by hand; see `heimdall/README.md`.
 
+**Let Stowaway set it up.** For Homarr, Homepage and Glance, the Integrations window has a **Set it up for me** section: tick the apps you want and click the button. Nothing changes until you do, and you can run it again after enabling more apps.
+
+- **Homarr:** uses Homarr's API with an API key you create in Homarr (*Manage → Tools → API*; Homarr 1.0+). For each app you choose whether to update an existing Homarr app (its name and icon are kept; its link and Ping URL are set) or add a new one. The key is used once and not saved.
+- **Homepage:** writes a group with your apps to `services.yaml`, between two marker comments. Only that block is ever rewritten; the rest of the file stays as it is, and the first time your original is saved as `services.yaml.before-stowaway`.
+- **Glance:** writes `stowaway.yml` next to `glance.yml` (a status monitor for your apps plus a list of all apps). Add it to a page once with `- $include: stowaway.yml` in a column's `widgets:`; after that Glance reloads it by itself.
+
 **Dashboard on a macvlan network?** It can't reach the server's own address, so its status checks fail ("fetch failed"). Use the macvlan helper IP instead, e.g. `http://192.168.1.60:8880/_stowaway/status/<app>?code=1`. Stowaway gives every container on a macvlan network a route through the helper once a helper IP is set, and the Integrations window fills in the helper address for you when it sees your dashboard on macvlan. Tile links you click keep using the usual address.
 
 Containers that only have a restart schedule (Maintenance tab) can be shown too: their status address gives running/stopped and the next restart.

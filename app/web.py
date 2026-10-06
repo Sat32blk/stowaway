@@ -45,6 +45,11 @@ def _coerce(tp, value, field: str):
         raise errors[0] if errors else ValidationError(f"{field} is required")
     if tp is typing.Any:
         return value
+    if isinstance(tp, type) and issubclass(tp, Model):
+        try:
+            return tp(value)
+        except ValidationError as e:
+            raise ValidationError(f"{field}: {e}")
     if origin is list:
         if not isinstance(value, list):
             raise ValidationError(f"{field} must be a list")

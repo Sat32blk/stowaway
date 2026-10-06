@@ -18,6 +18,7 @@ import ipaddress
 import re
 import logging
 import os
+import posixpath
 import secrets
 import signal
 import socket
@@ -28,7 +29,7 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import httpx
 import uvicorn
@@ -43,7 +44,7 @@ from websockets.asyncio.client import connect as ws_connect
 from websockets.exceptions import ConnectionClosed
 
 from app.auth import COOKIE, SESSION_DAYS, AuthStore, password_problems, username_problem
-from app import diagnostics, dockerapi, maintenance as maint, netconf, updates
+from app import dashsetup, diagnostics, dockerapi, maintenance as maint, netconf, updates
 from app.version import REPO_URL, VERSION
 from app.tokens import TokenStore
 from app.savings import LEARN_AFTER_START, Savings, host_info
@@ -2878,6 +2879,240 @@ async def revoke_token(token_id: str):
     if not api_tokens.revoke(token_id):
         raise HTTPException(404, "no such token")
     log.info("API token %s revoked", token_id)
+
+
+# ---- Dashboards: write Stowaway's status into Homarr, Homepage and Glance (only on request) ----
+DASH_IMAGES = {"homarr": "homarr", "homepage": "homepage", "glance": "glance"}
+
+
+async def dash_containers(kind: str) -> list[dict]:
+    if DEMO:
+        return [{"name": kind, "running": True}]
+    key = DASH_IMAGES[kind]
+    return [{"name": c["name"], "running": c["status"] == "running"}
+            for c in await driver.list()
+            if key in (c["image"] or "").lower() or (key != "homepage" and c["name"].lower() == key)]
+
+
+class DashApp(BaseModel):
+    name: str
+    link: str
+
+
+async def dash_items(apps: list) -> list[dict]:
+    """The apps the user picked, with their links checked and an icon guessed."""
+    if not apps:
+        raise HTTPException(400, "Pick at least one app.")
+    images = {} if DEMO else {c["name"]: c["image"] for c in await driver.list()}
+    out = []
+    for a in apps:
+        a = a if isinstance(a, dict) else a.model_dump()
+        svc = reg.services.get(a.get("name"))
+        if not svc:
+            raise HTTPException(404, f"{a.get('name')} isn't an app Stowaway manages")
+        try:
+            link = dashsetup.check_url(a.get("link"), f"The link for {svc.name}")
+        except dashsetup.SetupError as e:
+            raise HTTPException(400, str(e))
+        out.append({"name": svc.name, "link": link,
+                    "icon": dashsetup.icon_slug(images.get(svc.container, ""), svc.name)})
+    return out
+
+
+def dash_base(base: str) -> str:
+    try:
+        return dashsetup.check_url(base, "Stowaway's address")
+    except dashsetup.SetupError as e:
+        raise HTTPException(400, str(e))
+
+
+async def dash_target(kind: str, container: str) -> dict:
+    found = {c["name"]: c for c in await dash_containers(kind)}
+    c = found.get(container)
+    if not c:
+        raise HTTPException(404, f"{container} isn't a {kind.title()} container")
+    if not c["running"]:
+        raise HTTPException(409, f"Start {container} first.")
+    return {} if DEMO else await driver.dk.inspect(container)
+
+
+def glance_path(attrs: dict) -> str:
+    return dashsetup.config_path(attrs, "--config", "/app/config/glance.yml")
+
+
+def homepage_path(attrs: dict) -> str:
+    d = dashsetup.env_of(attrs).get("HOMEPAGE_CONFIG_DIR") or "/app/config"
+    return d.rstrip("/") + "/services.yaml"
+
+
+@admin.get("/api/dash/{kind}")
+async def dash_info(kind: str):
+    if kind not in DASH_IMAGES:
+        raise HTTPException(404)
+    out = {"containers": await dash_containers(kind)}
+    if kind == "homarr":
+        out["url"] = reg.settings.get("homarr_url", "")
+    if kind == "glance" and not DEMO:
+        for c in out["containers"]:
+            if c["running"]:
+                with contextlib.suppress(Exception):
+                    attrs = await driver.dk.inspect(c["name"])
+                    data, _ = await driver.dk.get_archive(c["name"], glance_path(attrs))
+                    c["included"] = bool(data) and dashsetup.glance_includes(data.decode("utf-8", "replace"))
+    return out
+
+
+class HomepageIn(BaseModel):
+    container: str
+    base: str
+    group: str = "Stowaway"
+    apps: list[DashApp]
+
+
+@admin.post("/api/dash/homepage")
+async def dash_homepage(body: HomepageIn):
+    items, base = await dash_items(body.apps), dash_base(body.base)
+    group = (body.group or "").strip()[:60] or "Stowaway"
+    attrs = await dash_target("homepage", body.container)
+    block = dashsetup.homepage_block(group, items, base)
+    if DEMO:
+        return {"ok": True, "message": f"Wrote {len(items)} app(s) to services.yaml (demo)."}
+    path = homepage_path(attrs)
+    data, info = await driver.dk.get_archive(body.container, path)
+    text = (data or b"").decode("utf-8", "replace")
+    try:
+        new = dashsetup.merge_services(text, block)
+    except dashsetup.SetupError as e:
+        raise HTTPException(400, str(e))
+    backup = path + ".before-stowaway"
+    have_backup, _ = await driver.dk.get_archive(body.container, backup)
+    if data and not have_backup:
+        await dashsetup.write_file(driver.dk, body.container, backup, data, info)
+    await dashsetup.write_file(driver.dk, body.container, path, new.encode(), info)
+    log.info("wrote %d app(s) to Homepage's services.yaml in %s", len(items), body.container)
+    msg = f"Wrote {len(items)} app(s) to the \"{group}\" group in services.yaml."
+    if data and not have_backup:
+        msg += " Your original was saved as services.yaml.before-stowaway."
+    if not dashsetup.on_volume(attrs, path):
+        msg += " Note: services.yaml isn't on a volume, so recreating Homepage would undo this."
+    return {"ok": True, "message": msg}
+
+
+class GlanceIn(BaseModel):
+    container: str
+    base: str
+    title: str = "Apps"
+    apps: list[DashApp]
+
+
+@admin.post("/api/dash/glance")
+async def dash_glance(body: GlanceIn):
+    items, base = await dash_items(body.apps), dash_base(body.base)
+    attrs = await dash_target("glance", body.container)
+    content = dashsetup.glance_file(items, base, (body.title or "").strip()[:60] or "Apps")
+    if DEMO:
+        return {"ok": True, "included": False, "message": f"Wrote stowaway.yml with {len(items)} app(s) (demo)."}
+    main_cfg = glance_path(attrs)
+    data, info = await driver.dk.get_archive(body.container, main_cfg)
+    if data is None:
+        raise HTTPException(400, f"Couldn't find Glance's config at {main_cfg} in {body.container}.")
+    path = posixpath.join(posixpath.dirname(main_cfg), dashsetup.GLANCE_FILE)
+    await dashsetup.write_file(driver.dk, body.container, path, content.encode(), info)
+    included = dashsetup.glance_includes(data.decode("utf-8", "replace"))
+    log.info("wrote %s with %d app(s) in %s", path, len(items), body.container)
+    msg = f"Wrote stowaway.yml with {len(items)} app(s)."
+    msg += (" Glance picks up the change by itself." if included else
+            " One more step: add the line below to glance.yml.")
+    if not dashsetup.on_volume(attrs, path):
+        msg += " Note: Glance's config folder isn't on a volume, so recreating Glance would undo this."
+    return {"ok": True, "included": included, "message": msg}
+
+
+class HomarrIn(BaseModel):
+    url: str
+    key: str
+    apps: list[DashApp] = []
+
+
+class HomarrItem(BaseModel):
+    name: str
+    link: str
+    target: str            # a Homarr app id, or "new"
+
+
+class HomarrApplyIn(BaseModel):
+    url: str
+    key: str
+    base: str
+    items: list[HomarrItem]
+
+
+DEMO_HOMARR = [{"id": "a1", "name": "Jellyfin", "href": "http://192.168.1.2:8096", "pingUrl": None,
+                "iconUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/jellyfin.svg"},
+               {"id": "a2", "name": "Grafana", "href": "http://192.168.1.2:3000", "pingUrl": None,
+                "iconUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/grafana.svg"}]
+
+
+@admin.post("/api/dash/homarr/apps")
+async def dash_homarr_apps(body: HomarrIn):
+    """Homarr's apps, with a suggested match for each Stowaway app."""
+    try:
+        url = dashsetup.check_url(body.url, "Homarr's address")
+        apps = DEMO_HOMARR if DEMO else await dashsetup.homarr_call("GET", url, body.key, "/api/apps")
+    except dashsetup.SetupError as e:
+        raise HTTPException(400, str(e))
+    if reg.settings.get("homarr_url") != url:
+        reg.settings["homarr_url"] = url
+        reg.save()
+    taken, matches = set(), {}
+    for a in body.apps:
+        a = a if isinstance(a, dict) else a.model_dump()
+        mid = dashsetup.homarr_match([x for x in apps if x["id"] not in taken], a["name"], a["link"])
+        matches[a["name"]] = mid or "new"
+        if mid:
+            taken.add(mid)
+    return {"apps": [{k: x.get(k) for k in ("id", "name", "href", "pingUrl")} for x in apps], "matches": matches}
+
+
+@admin.post("/api/dash/homarr/apply")
+async def dash_homarr_apply(body: HomarrApplyIn):
+    """Set the Ping URL on the chosen Homarr apps, or create new ones. Name, icon
+    and description of existing apps are kept; the link is set to Stowaway's."""
+    base = dash_base(body.base)
+    items = await dash_items([{"name": i.name, "link": i.link} for i in body.items if i.target != "skip"])
+    target = {i.name: i.target for i in body.items}
+    try:
+        url = dashsetup.check_url(body.url, "Homarr's address")
+        apps = DEMO_HOMARR if DEMO else await dashsetup.homarr_call("GET", url, body.key, "/api/apps")
+        by_id = {a["id"]: a for a in apps}
+        done = []
+        for it in items:
+            _, dot = dashsetup.status_urls(base, it["name"])
+            t = target[it["name"]]
+            if t == "new":
+                payload = {"name": it["name"][:64], "description": "Wakes when opened · managed by Stowaway",
+                           "iconUrl": f"https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/{it['icon']}.svg",
+                           "href": it["link"], "pingUrl": dot}
+                if not DEMO:
+                    await dashsetup.homarr_call("POST", url, body.key, "/api/apps", payload)
+                done.append(f"added {it['name']}")
+            else:
+                a = by_id.get(t)
+                if not a:
+                    raise dashsetup.SetupError(f"The Homarr app chosen for {it['name']} no longer exists; load the list again.")
+                payload = {"id": a["id"], "name": a["name"], "description": a.get("description"),
+                           "iconUrl": a.get("iconUrl") or "", "href": it["link"], "pingUrl": dot}
+                if not DEMO:
+                    await dashsetup.homarr_call("PATCH", url, body.key, f"/api/apps/{quote(a['id'], safe='')}", payload)
+                done.append(f"updated {a['name']}")
+    except dashsetup.SetupError as e:
+        raise HTTPException(400, str(e))
+    log.info("Homarr at %s: %s", url, ", ".join(done))
+    new = sum(1 for d in done if d.startswith("added"))
+    msg = f"Done: {', '.join(done)}."
+    if new:
+        msg += " New apps are in Homarr's app list; add them to a board with an App widget."
+    return {"ok": True, "message": msg}
 
 
 # ---- Heimdall: install the Stowaway tile ("enhanced app") into a Heimdall container ----

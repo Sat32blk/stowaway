@@ -1672,6 +1672,95 @@ function dashOnMacvlan(tab) {
   const re = DASH_MATCH[tab];
   return re && containers.find(c => c.macvlan_ip && (re.test(c.name.toLowerCase()) || re.test((c.image || '').toLowerCase())));
 }
+const SETUP_KINDS = ['homarr', 'homepage', 'glance'];
+let intSB = '', homarrApps = null;
+function intTabName() { return { homarr: 'Homarr', homepage: 'Homepage', glance: 'Glance' }[intTab] || intTab; }
+function setupApps() { return intItems.filter(i => i.controlled && i.link); }
+function pickedApps() {
+  return [...document.querySelectorAll('#dashSetup input[data-pick]:checked')]
+    .map(cb => setupApps().find(i => i.name === cb.dataset.pick)).filter(Boolean).map(i => ({ name: i.name, link: i.link }));
+}
+async function loadDashSetup(kind) {
+  const box = $('dashSetup');
+  let r;
+  try { r = await api('/dash/' + kind); } catch (e) { box.innerHTML = `<h3>Set it up for me</h3><span class="hint">${esc(e.message)}</span>`; return; }
+  if (!$('dashSetup') || intTab !== kind) return;
+  const name = intTabName(), apps = setupApps();
+  let h = '<h3>Set it up for me</h3>';
+  if (!apps.length) { box.innerHTML = h + `<span class="hint">${intItems.some(i => i.controlled) ? 'None of your apps has a link to open it with. Give one a link port (Edit) first.' : 'Enable Stowaway on an app first.'}</span>`; return; }
+  const running = r.containers.filter(c => c.running);
+  if (kind !== 'homarr' && !running.length) {
+    box.innerHTML = h + `<span class="hint">${r.containers.length ? `Start ${esc(r.containers[0].name)} first.` : `No running ${name} container found on this server.`} You can still set it up by hand below.</span>`;
+    return;
+  }
+  const what = { homarr: 'Fills in each app\'s Ping URL in Homarr (and can add apps it doesn\'t have yet), using Homarr\'s API.',
+    homepage: 'Adds a group with these apps to Homepage\'s services.yaml. Only that group is written; the rest of the file stays as it is, and the first time, your original is saved next to it.',
+    glance: 'Writes a stowaway.yml file next to glance.yml with a status monitor for these apps and a list of all apps. You add it to a page with one line.' }[kind];
+  h += `<p class="hint" style="margin:0">${what} Nothing changes until you click the button; click it again after enabling more apps.</p>`;
+  h += `<div style="display:flex;flex-wrap:wrap;gap:6px 14px">${apps.map(i =>
+    `<label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" data-pick="${esc(i.name)}" checked> ${esc(i.name)}</label>`).join('')}</div>`;
+  if (kind !== 'homarr' && running.length > 1)
+    h += `<label>${name} container <select id="dsCont">${running.map(c => `<option>${esc(c.name)}</option>`).join('')}</select></label>`;
+  else if (kind !== 'homarr') h += `<input type="hidden" id="dsCont" value="${esc(running[0].name)}">`;
+  if (kind === 'homepage') {
+    h += `<label>Group name <input id="dsGroup" value="Stowaway" maxlength="60"></label>
+      <p class="hint" style="margin:0">If these apps already have tiles elsewhere in services.yaml, they'll show twice; remove the old ones.</p>
+      <div><button type="button" class="primary" id="dsGo">Write to services.yaml</button></div>`;
+  } else if (kind === 'glance') {
+    h += `<label>Monitor title <input id="dsTitle" value="Apps" maxlength="60"></label>
+      <div><button type="button" class="primary" id="dsGo">Write stowaway.yml</button></div>`;
+  } else {
+    h += `<label>Homarr address <small>as Stowaway can reach it, e.g. http://192.168.1.6:7575</small>
+        <input id="dsUrl" value="${esc(r.url || '')}" placeholder="http://192.168.1.6:7575" inputmode="url"></label>
+      <label>Homarr API key <small>Homarr: Manage → Tools → API → create. Used once, not saved.</small>
+        <input id="dsKey" type="password" autocomplete="off" placeholder="abc123.…"></label>
+      <div><button type="button" id="dsLoad">Load Homarr's apps</button></div>
+      <div id="dsMatch"></div>`;
+  }
+  h += `<div id="dsMsg" class="hint" style="margin:0"></div>`;
+  box.innerHTML = h;
+}
+function glanceIncludeHelp() {
+  return codeBlock(`pages:
+  - name: Home
+    columns:
+      - size: full
+        widgets:
+          - $include: stowaway.yml`, 'Add the <code>$include</code> line to the <code>widgets:</code> of any column in <code>glance.yml</code> (keep its indentation):');
+}
+$('intBody').addEventListener('click', async (e) => {
+  const t = e.target.closest('#dsGo, #dsLoad, #dsApply');
+  if (!t) return;
+  const msg = $('dsMsg'), kind = intTab;
+  const apps = pickedApps();
+  if (!apps.length) { msg.textContent = 'Pick at least one app.'; return; }
+  t.disabled = true; msg.textContent = 'Working…';
+  try {
+    if (t.id === 'dsGo' && kind === 'homepage') {
+      const r = await api('/dash/homepage', { method: 'POST', body: JSON.stringify({ container: $('dsCont').value, base: intSB, group: $('dsGroup').value, apps }) });
+      msg.innerHTML = `<b>${esc(r.message)}</b> Reload Homepage to see it.`;
+    } else if (t.id === 'dsGo' && kind === 'glance') {
+      const r = await api('/dash/glance', { method: 'POST', body: JSON.stringify({ container: $('dsCont').value, base: intSB, title: $('dsTitle').value, apps }) });
+      msg.innerHTML = `<b>${esc(r.message)}</b>` + (r.included ? '' : glanceIncludeHelp());
+    } else if (t.id === 'dsLoad') {
+      const r = await api('/dash/homarr/apps', { method: 'POST', body: JSON.stringify({ url: $('dsUrl').value, key: $('dsKey').value, apps }) });
+      homarrApps = r.apps;
+      const opts = (sel) => `<option value="new"${sel === 'new' ? ' selected' : ''}>Add as a new Homarr app</option>`
+        + r.apps.map(a => `<option value="${esc(a.id)}"${sel === a.id ? ' selected' : ''}>Update “${esc(a.name)}”${a.href ? ' · ' + esc(a.href) : ''}</option>`).join('')
+        + `<option value="skip"${sel === 'skip' ? ' selected' : ''}>Skip</option>`;
+      $('dsMatch').innerHTML = `<div style="display:grid;gap:8px">${apps.map(a => `<label style="font-weight:400"><b>${esc(a.name)}</b>
+          <select data-match="${esc(a.name)}">${opts(r.matches[a.name] || 'new')}</select></label>`).join('')}
+        <p class="hint" style="margin:0">Updating keeps the Homarr app's name and icon, and sets its link to Stowaway's link and its Ping URL to Stowaway's status address.</p>
+        <div><button type="button" class="primary" id="dsApply">Apply to Homarr</button></div></div>`;
+      msg.textContent = `Found ${r.apps.length} app(s) in Homarr. Check the matches, then apply.`;
+    } else if (t.id === 'dsApply') {
+      const items = apps.map(a => ({ ...a, target: (document.querySelector(`select[data-match="${CSS.escape(a.name)}"]`) || {}).value || 'skip' }));
+      const r = await api('/dash/homarr/apply', { method: 'POST', body: JSON.stringify({ url: $('dsUrl').value, key: $('dsKey').value, base: intSB, items }) });
+      msg.innerHTML = `<b>${esc(r.message)}</b> The dots update within a minute.`;
+    }
+  } catch (err) { msg.textContent = err.message; }
+  t.disabled = false;
+});
 async function loadHeimdall() {
   const box = $('hmInstall');
   if (!box) return;
@@ -1704,6 +1793,7 @@ function renderInt() {
   // A dashboard on a macvlan network can't reach the server's own address, only the helper's.
   const dashC = dashOnMacvlan(intTab), shimIp = settingsCache.macvlan_shim_ip;
   const SB = dashC && shimIp ? BASE.replace(location.hostname, shimIp) : BASE;
+  intSB = SB;
   const n = i.name, st = `${SB}/status/${encodeURIComponent(n)}`, dot = `${st}?code=1`;
   const link = i.link || `http://${host}`, wake = `${SB}/wake/${encodeURIComponent(n)}`, api = `${SB}/api/v1/apps/${encodeURIComponent(n)}`;
   const slug = n.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
@@ -1845,6 +1935,10 @@ rest_command:
       <div><b>Open / wake</b><br><code>${esc(link)}</code></div>
       <div><b>API</b> · with a token: <code>GET ${esc(api)}</code>, <code>POST …/wake</code>, <code>…/sleep</code> <code>{"block": true}</code>, <code>…/block</code> <code>{"on": true}</code>, <code>…/keep-awake</code> <code>{"minutes": 60}</code>, <code>…/restart</code></div></div>`;
   }
+  if (SETUP_KINDS.includes(intTab)) {
+    h = `<div class="section" id="dashSetup" style="border-top:0;padding-top:0"><h3>Set it up for me</h3><span class="hint">Looking for ${esc(intTabName())}…</span></div>
+      <div class="section"><h3>Or by hand</h3>${h}</div>`;
+  }
   if (dashC) {
     const who = esc(dashC.name);
     h = (shimIp
@@ -1853,6 +1947,7 @@ rest_command:
   }
   $('intBody').innerHTML = h;
   if (intTab === 'heimdall') loadHeimdall();
+  if (SETUP_KINDS.includes(intTab)) loadDashSetup(intTab);
 }
 async function loadTokens() {
   try {

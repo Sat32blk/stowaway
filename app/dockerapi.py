@@ -224,6 +224,21 @@ class Docker:
                                 headers={"Content-Type": "application/x-tar"})
         self._raise(r)
 
+    async def get_archive(self, name: str, path: str):
+        """Read one file from a container. Returns (bytes, tarinfo) or (None, None) if it doesn't exist."""
+        if self.api_version is None:
+            await self.negotiate()
+        r = await self.http.get(self._url(f"/containers/{quote(name, safe='')}/archive"), params={"path": path})
+        if r.status_code == 404:
+            return None, None
+        self._raise(r)
+        import io, tarfile
+        with tarfile.open(fileobj=io.BytesIO(r.content)) as tar:
+            for m in tar.getmembers():
+                if m.isfile():
+                    return tar.extractfile(m).read(), m
+        return None, None
+
     async def exec_run(self, name: str, cmd: "list[str]", user: str = "", timeout: float = 120):
         """Run a command in a running container. Returns (exit code, output)."""
         ex = await self.request("POST", f"/containers/{quote(name, safe='')}/exec", json_body={
