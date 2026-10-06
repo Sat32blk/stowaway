@@ -70,7 +70,7 @@ class Stowaway extends \App\SupportedApps implements \App\EnhancedApps
         return parent::getLiveStats($status, $data);
     }
 
-    public function url()
+    public function url($endpoint = "")
     {
         $base = (string) ($this->config->url ?? "");
         $base = preg_replace('#/_stowaway/?$#', '', rtrim($base, '/'));

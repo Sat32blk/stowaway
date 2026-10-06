@@ -28,6 +28,8 @@ docker cp heimdall/Stowaway heimdall:/app/www/app/SupportedApps/Stowaway
 docker exec heimdall php /app/www/artisan register:app Stowaway
 ```
 
+Heimdall 2.8.3 and earlier have a bug where that second command fails with *There are no commands defined in the "register" namespace*. The button in Stowaway works around it; by hand, use the button instead or wait for a newer Heimdall.
+
 With the linuxserver image the tile is stored under Heimdall's `/config`, so it survives updates. If it ever disappears, repeat the two commands (or click the button again).
 
 ## Submitting it to Heimdall

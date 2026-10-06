@@ -3117,6 +3117,21 @@ async def dash_homarr_apply(body: HomarrApplyIn):
 
 # ---- Heimdall: install the Stowaway tile ("enhanced app") into a Heimdall container ----
 HEIMDALL_APP = Path(__file__).resolve().parent.parent / "heimdall" / "Stowaway"
+HEIMDALL_REGISTER_PHP = r"""<?php
+// Same steps as Heimdall's "php artisan register:app Stowaway".
+require '/app/www/vendor/autoload.php';
+$app = require '/app/www/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$dir = app_path('SupportedApps/Stowaway');
+$details = json_decode(file_get_contents($dir . '/app.json'));
+if (App\Application::find($details->appid)) {
+    echo "Application already registered - Stowaway\n";
+    exit(0);
+}
+App\SupportedApps::saveApp($details, new App\Application);
+Illuminate\Support\Facades\Storage::disk('public')->put('icons/' . $details->icon, file_get_contents($dir . '/' . $details->icon));
+echo "Application Added - Stowaway\n";
+"""
 
 
 async def heimdall_containers() -> list[dict]:
@@ -3166,7 +3181,12 @@ async def heimdall_install(body: HeimdallIn):
     await dk.exec_run(body.container, ["sh", "-c", f"chown -R abc:abc '{apps_dir}/Stowaway' 2>/dev/null || true"])
     code, out = await dk.exec_run(body.container, ["php", "/app/www/artisan", "register:app", "Stowaway"], user="abc")
     if code != 0 and "already registered" not in out:
-        code, out = await dk.exec_run(body.container, ["php", "/app/www/artisan", "register:app", "Stowaway"])
+        # Heimdall 2.8.x drops its own register:app command at startup (fixed after 2.8.3,
+        # linuxserver/Heimdall#1606). Do what that command does, through Heimdall's own code.
+        await dk.put_archive(body.container, "/tmp", dashsetup.tar_one(
+            "/tmp/stowaway-register.php", HEIMDALL_REGISTER_PHP.encode(), None))
+        code, out = await dk.exec_run(body.container, ["php", "/tmp/stowaway-register.php"], user="abc")
+        await dk.exec_run(body.container, ["rm", "-f", "/tmp/stowaway-register.php"])
     if code != 0 and "already registered" not in out:
         log.warning("Heimdall tile install in %s: %s", body.container, out.strip()[-500:])
         raise HTTPException(500, f"Heimdall couldn't register the tile: {out.strip()[-300:] or 'no details'}")
