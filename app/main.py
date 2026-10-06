@@ -3118,19 +3118,38 @@ async def dash_homarr_apply(body: HomarrApplyIn):
 # ---- Heimdall: install the Stowaway tile ("enhanced app") into a Heimdall container ----
 HEIMDALL_APP = Path(__file__).resolve().parent.parent / "heimdall" / "Stowaway"
 HEIMDALL_REGISTER_PHP = r"""<?php
-// Same steps as Heimdall's "php artisan register:app Stowaway".
+// Registers the Stowaway tile type, like Heimdall's "php artisan register:app Stowaway"
+// (which Heimdall 2.8.3 and earlier drop at startup), then works around how
+// Heimdall handles icons of locally added tile types.
 require '/app/www/vendor/autoload.php';
 $app = require '/app/www/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 $dir = app_path('SupportedApps/Stowaway');
 $details = json_decode(file_get_contents($dir . '/app.json'));
-if (App\Application::find($details->appid)) {
+$application = App\Application::find($details->appid);
+if ($application) {
     echo "Application already registered - Stowaway\n";
-    exit(0);
+} else {
+    $application = App\SupportedApps::saveApp($details, new App\Application);
+    echo "Application Added - Stowaway\n";
 }
-App\SupportedApps::saveApp($details, new App\Application);
 Illuminate\Support\Facades\Storage::disk('public')->put('icons/' . $details->icon, file_get_contents($dir . '/' . $details->icon));
-echo "Application Added - Stowaway\n";
+// When a tile is added, Heimdall turns the icon into a full address on Heimdall
+// itself and then refuses to download it ("private or reserved IPs"), so the tile
+// can't be saved or ends up without an icon. An icon value containing "://" is
+// used as is instead. "../storage/icons/x" shows in the add-tile form, and as a
+// tile Heimdall prefixes it with /storage/, which browsers resolve to the same
+// file. The "#://" is ignored by browsers.
+$icon = '../storage/icons/' . $details->icon . '#://';
+$application->icon = $icon;
+$application->save();
+// Repair Stowaway tiles saved without an icon.
+$fixed = App\Item::where('appid', $details->appid)->where(function ($q) {
+    $q->whereNull('icon')->orWhere('icon', '');
+})->update(['icon' => $icon]);
+if ($fixed) {
+    echo "Added the icon to $fixed existing tile(s)\n";
+}
 """
 
 
@@ -3179,24 +3198,28 @@ async def heimdall_install(body: HeimdallIn):
     await dk.put_archive(body.container, apps_dir, buf.getvalue())
     # Heimdall runs as user "abc"; it needs to own its files. Harmless if that user doesn't exist.
     await dk.exec_run(body.container, ["sh", "-c", f"chown -R abc:abc '{apps_dir}/Stowaway' 2>/dev/null || true"])
-    code, out = await dk.exec_run(body.container, ["php", "/app/www/artisan", "register:app", "Stowaway"], user="abc")
-    if code != 0 and "already registered" not in out:
-        # Heimdall 2.8.x drops its own register:app command at startup (fixed after 2.8.3,
-        # linuxserver/Heimdall#1606). Do what that command does, through Heimdall's own code.
-        await dk.put_archive(body.container, "/tmp", dashsetup.tar_one(
-            "/tmp/stowaway-register.php", HEIMDALL_REGISTER_PHP.encode(), None))
-        code, out = await dk.exec_run(body.container, ["php", "/tmp/stowaway-register.php"], user="abc")
-        await dk.exec_run(body.container, ["rm", "-f", "/tmp/stowaway-register.php"])
-    if code != 0 and "already registered" not in out:
+    # Register through Heimdall's own code. Its "artisan register:app" command is
+    # missing in Heimdall 2.8.3 and earlier (linuxserver/Heimdall#1606), and the icon
+    # needs adjusting anyway (see HEIMDALL_REGISTER_PHP).
+    script = f"{apps_dir}/Stowaway/.stowaway-register.php"
+    await dk.put_archive(body.container, f"{apps_dir}/Stowaway", dashsetup.tar_one(
+        script, HEIMDALL_REGISTER_PHP.encode(), None))
+    code, out = await dk.exec_run(body.container, ["php", script], user="abc")
+    if code != 0 and "Application" not in out:
+        code, out = await dk.exec_run(body.container, ["php", script])
+    await dk.exec_run(body.container, ["rm", "-f", script])
+    if code != 0:
         log.warning("Heimdall tile install in %s: %s", body.container, out.strip()[-500:])
         raise HTTPException(500, f"Heimdall couldn't register the tile: {out.strip()[-300:] or 'no details'}")
     updated = "already registered" in out
-    if updated:
-        # PHP caches compiled code and doesn't look for changes; restart it so the new files are used.
-        await dk.exec_run(body.container, ["sh", "-c", "s6-svc -r /run/service/svc-php-fpm 2>/dev/null || true"])
+    # PHP caches compiled code and doesn't look for changes; restart it so the new files are used.
+    await dk.exec_run(body.container, ["sh", "-c", "s6-svc -r /run/service/svc-php-fpm 2>/dev/null || true"])
     log.info("Stowaway tile %s in Heimdall (%s)", "updated" if updated else "installed", body.container)
-    return {"ok": True, "updated": updated,
-            "message": "Updated the Stowaway tile in Heimdall." if updated else "Added the Stowaway tile to Heimdall."}
+    msg = "Updated the Stowaway tile type in Heimdall." if updated else "Added the Stowaway tile type to Heimdall."
+    fixed = re.search(r"Added the icon to (\d+)", out)
+    if fixed:
+        msg += f" Also gave {fixed.group(1)} existing tile(s) their icon."
+    return {"ok": True, "updated": updated, "message": msg}
 
 
 # ---- v1 API: stable endpoints for Home Assistant and other automation ----

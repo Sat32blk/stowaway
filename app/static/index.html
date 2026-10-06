@@ -1858,11 +1858,11 @@ function renderInt() {
     h = codeBlock(code, 'Add to a column in <code>glance.yml</code>. The second widget lists every app with its state and next restart.');
   } else if (intTab === 'heimdall') {
     h = `<ol class="steps">
-      <li>Add an app tile with URL <code>${esc(link)}</code>.</li>
       <li>Heimdall has no status dot for ordinary tiles; the <b>Stowaway</b> tile type shows "Awake/Asleep" and the next restart instead. Add it to Heimdall (once; it stays through Heimdall updates):
         <div id="hmInstall" style="margin-top:6px"><span class="hint">Looking for Heimdall…</span></div></li>
-      <li>Edit the tile and choose <b>Stowaway</b> as the application type.</li>
-      <li>In the tile's config, enter the dashboard address <code>${esc(SB.replace(/\/_stowaway$/, ''))}</code> and the app name <code>${esc(n)}</code>.</li></ol>`;
+      <li>In Heimdall, add or edit the tile: choose <b>Stowaway</b> as the application type, then set <b>Title</b> to <code>${esc(n)}</code> (otherwise it's called "Stowaway") and <b>URL</b> to <code>${esc(link)}</code>.</li>
+      <li>Under <b>Config</b>, switch <b>Enable</b> on (without it the tile shows no status), enter <code>${esc(SB.replace(/\/_stowaway$/, ''))}</code> as the URL and <code>${esc(n)}</code> as the App name, and click <b>Test</b>. Save.</li>
+      <li>The tile shows the Stowaway icon. To use the app's own icon instead, upload it in the tile's icon field.</li></ol>`;
   } else if (intTab === 'ha') {
     const code = `# configuration.yaml: replace YOUR_TOKEN with a token from below
 rest:

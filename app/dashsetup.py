@@ -175,16 +175,24 @@ def env_of(attrs: dict) -> dict:
 
 # ------------------------------------------------------------------ Homarr --
 async def homarr_call(method: str, url: str, key: str, path: str, body=None):
-    headers = {"ApiKey": key.strip(), "Accept": "application/json"}
+    key = "".join((key or "").split())          # copied keys sometimes pick up spaces or line breaks
+    if key.count(".") != 1:
+        raise SetupError("That doesn't look like a Homarr API key: it should be two parts joined by a dot, "
+                         "like 1a2b3c4d.Xy… Copy it again from Homarr (it's only shown once, right after creating it).")
+    headers = {"ApiKey": key, "Accept": "application/json"}
     try:
         async with httpx.AsyncClient(timeout=15, verify=False) as c:
             r = await c.request(method, url + path, headers=headers, json=body)
     except httpx.HTTPError as e:
         raise SetupError(f"Couldn't reach Homarr at {url} ({e.__class__.__name__}). Check the address; "
                          "if Homarr is on a macvlan network, use its own address, e.g. http://192.168.1.6:7575.")
-    if r.status_code in (401, 403):
-        raise SetupError("Homarr refused the API key. Create one in Homarr under Manage → Tools → API "
-                         "(it looks like abc123.xyz…), as a user allowed to change apps.")
+    if r.status_code == 401:
+        raise SetupError("Homarr didn't accept the API key. Paste the whole key exactly as Homarr showed it "
+                         "(two parts joined by a dot, like 1a2b3c4d.Xy…). Homarr's log says why it was "
+                         "refused: run  docker logs homarr 2>&1 | grep -i api-key  on the server.")
+    if r.status_code == 403:
+        raise SetupError("Homarr accepted the API key, but its user isn't allowed to change apps. "
+                         "Create the key while signed in as a Homarr admin.")
     if r.status_code == 404:
         raise SetupError("Homarr didn't recognise the request. This needs Homarr 1.0 or newer.")
     if r.status_code >= 400:
@@ -193,7 +201,13 @@ async def homarr_call(method: str, url: str, key: str, path: str, body=None):
         except ValueError:
             detail = r.text
         raise SetupError(f"Homarr answered {r.status_code}: {str(detail)[:200]}")
-    return r.json() if r.content else None
+    if r.status_code >= 300:
+        raise SetupError(f"Homarr answered {r.status_code} (a redirect). Use Homarr's address exactly as it "
+                         "opens in your browser, including http:// or https://.")
+    try:
+        return r.json() if r.content else None
+    except ValueError:
+        raise SetupError("Homarr's answer wasn't what Stowaway expected. Check that the address is Homarr's.")
 
 
 def homarr_match(apps: list[dict], name: str, link: str) -> str | None:
