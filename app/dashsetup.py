@@ -59,14 +59,7 @@ def homepage_block(group: str, items: list[dict], base: str) -> str:
                 "type": "customapi",
                 "url": st,
                 "refreshInterval": 15000,
-                "mappings": [
-                    {"field": "state", "label": "Status",
-                     "remap": [{"value": "running", "to": "Awake"},
-                               {"value": "sleeping", "to": "Asleep"},
-                               {"value": "starting", "to": "Starting"},
-                               {"any": True, "to": "Working"}]},
-                    {"field": "maintenance.next_restart_text", "label": "Restart"},
-                ],
+                "mappings": [{"field": "indicator", "label": "Status"}],
             },
         }})
     body = yaml.safe_dump([{group: services}], sort_keys=False, allow_unicode=True, width=1000)
@@ -102,10 +95,15 @@ def merge_services(text: str, block: str) -> str:
 
 
 # ------------------------------------------------------------------ Glance --
+GLANCE_COLORS = {"green": "hsl(134, 50%, 60%)", "yellow": "hsl(45, 95%, 55%)", "orange": "hsl(27, 98%, 58%)",
+                 "teal": "hsl(162, 75%, 45%)", "blue": "hsl(207, 90%, 63%)", "red": "hsl(0, 94%, 65%)"}
 GLANCE_TEMPLATE = """<ul class="list list-gap-10 collapsible-container" data-collapse-after="8">
 {{ range .JSON.Array "apps" }}
-  <li><span class="color-highlight">{{ .String "name" }}</span>
-    <span class="color-subdue">{{ .String "summary" }}</span></li>
+  <li class="flex justify-between items-center gap-10"><span class="color-highlight">{{ .String "name" }}</span>
+""" + "".join(
+    f'    {{{{ {"if" if i == 0 else "else if"} eq (.String "indicator_color") "{c}" }}}}'
+    f'<span style="color: {v}; font-weight: 600">{{{{ .String "indicator" }}}}</span>\n'
+    for i, (c, v) in enumerate(GLANCE_COLORS.items())) + """    {{ else }}<span class="color-subdue">{{ .String "indicator" }}</span>{{ end }}</li>
 {{ end }}
 </ul>
 """
@@ -171,6 +169,43 @@ def config_path(attrs: dict, flag: str, default: str) -> str:
 
 def env_of(attrs: dict) -> dict:
     return dict(e.split("=", 1) for e in (attrs.get("Config") or {}).get("Env") or [] if "=" in e)
+
+
+# ------------------------------------------------------- Homarr status widget --
+HOMARR_WIDGET_TEMPLATE = """<Stack gap={6} p="sm" h="100%" justify="center" style={{ minWidth: 0 }}>
+  <Group justify="space-between" wrap="nowrap" gap="xs"><Text size="xs" c="dimmed" tt="uppercase" fw={700} truncate>{options.title || data.status?.name || options.app}</Text><RefreshButton requestId="status" label="Refresh status" size="xs" /></Group>
+  {status.status?.loading && !data.status ? <Skeleton height={34} radius="md" /> : status.status?.ok === false ? <Text size="sm" c="red">{options.app ? "Can't reach Stowaway, or no app named " + options.app : "Choose the app in this widget's settings"}</Text> : <Group gap="sm" wrap="nowrap"><ThemeIcon color={data.status?.indicator_color ?? "gray"} variant="light" radius="xl" size="lg"><Icon name={data.status?.indicator_icon ?? "moon"} size={20} /></ThemeIcon><Text fw={700} size="lg" c={data.status?.indicator_color ?? "gray"} truncate>{data.status?.indicator ?? "Unknown"}</Text></Group>}
+  {(data.status?.sleeps_in ?? 0) > 0 && (data.status?.idle_timeout ?? 0) > 0 ? <Progress value={Math.min(100, data.status.sleeps_in * 100 / data.status.idle_timeout)} color="yellow" size="sm" radius="xl" /> : null}
+</Stack>"""
+
+
+def homarr_widget(base: str) -> dict:
+    """A Homarr custom widget ("Stowaway status") that shows one app's status.
+    Import it once in Homarr, then pick the app in each placed widget's settings."""
+    host = (urlsplit(base).hostname or "").lower()
+    if host in ("localhost", "127.0.0.1", "::1"):
+        scope = "loopback"
+    else:
+        try:
+            import ipaddress
+            scope = "private" if ipaddress.ip_address(host).is_private else "public"
+        except ValueError:
+            scope = "private" if host.endswith((".local", ".lan", ".home", ".internal", ".home.arpa")) or "." not in host else "public"
+    return {
+        "$schema": "homarr-custom-widget-v2",
+        "name": "Stowaway status",
+        "description": "Shows whether an app Stowaway manages is In Use, Sleeping in a few minutes, Ready to Sleep or Sleeping. Checking never wakes the app.",
+        "iconUrl": "https://raw.githubusercontent.com/Sat32blk/Stowaway/main/heimdall/Stowaway/stowaway.svg",
+        "sources": {"default": {"name": "Stowaway", "baseUrl": base, "networkScope": scope, "auth": "none"}},
+        "requests": {"status": {"path": "/status/{option:app}", "cacheSeconds": 10}},
+        "options": {
+            "app": {"label": "App name", "description": "The app's name in Stowaway, e.g. jellyfin",
+                    "control": "text", "default": ""},
+            "title": {"label": "Title", "description": "Shown above the status; leave empty to use the app's name",
+                      "control": "text", "default": ""},
+        },
+        "template": HOMARR_WIDGET_TEMPLATE,
+    }
 
 
 # ------------------------------------------------------------------- icons --

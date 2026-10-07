@@ -2,8 +2,7 @@
 
 An "enhanced app" for [Heimdall](https://github.com/linuxserver/Heimdall). A tile shows:
 
-- **Status:** Awake, Asleep, Switched off, Waking, Updating or Maintenance.
-- **Restart:** when its next scheduled restart is.
+- **Status:** **In Use**, **Sleeping in 8 min**, **Ready to Sleep** or **Sleeping**, in colour. While something is changing it shows *Waking up*, *Going to sleep* or *Updating*, and *Kept awake* when you've asked Stowaway to keep the app awake.
 
 It reads Stowaway's status address, which never wakes the app.
 

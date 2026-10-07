@@ -17,6 +17,7 @@ import contextlib
 import ipaddress
 import re
 import logging
+import math
 import os
 import posixpath
 import secrets
@@ -1512,6 +1513,39 @@ def maint_brief(container: str):
     }
 
 
+# The one-line status shown on dashboards: label, colour (Mantine/Homarr colour
+# name), the same colour as hex for dashboards that need it, and a Tabler icon
+# (one of the names Homarr's custom widgets allow).
+INDICATORS = {
+    "in_use": ("In Use", "green", "#40c057", "activity"),
+    "countdown": ("Sleeping in {}", "yellow", "#fab005", "clock"),
+    "ready": ("Ready to Sleep", "orange", "#fd7e14", "power"),
+    "sleeping": ("Sleeping", "gray", "#909296", "moon"),
+    "kept": ("Kept awake", "teal", "#12b886", "lock"),
+    "waking": ("Waking up", "blue", "#4dabf7", "sun"),
+    "stopping": ("Going to sleep", "blue", "#4dabf7", "loader"),
+    "updating": ("Updating", "blue", "#4dabf7", "download"),
+    "failed": ("Failed to start", "red", "#fa5252", "alert-triangle"),
+    "running": ("Running", "green", "#40c057", "player-play"),
+    "stopped": ("Stopped", "gray", "#909296", "player-stop"),
+}
+
+
+def _minutes_text(seconds: float) -> str:
+    mins = max(1, math.ceil(seconds / 60))
+    if mins < 60:
+        return f"{mins} min"
+    h, m = divmod(mins, 60)
+    return f"{h} h {m} min" if m else f"{h} h"
+
+
+def indicator(kind: str, sleeps_in: float | None = None) -> dict:
+    label, color, hexc, icon = INDICATORS[kind]
+    if kind == "countdown":
+        label = label.format(_minutes_text(sleeps_in or 0))
+    return {"indicator": label, "indicator_color": color, "indicator_hex": hexc, "indicator_icon": icon}
+
+
 def app_status(svc: "Service") -> dict:
     now = time.time()
     if svc.transition:
@@ -1554,6 +1588,19 @@ def app_status(svc: "Service") -> dict:
         summary += f" · restart {m['next_restart_text']}"
     if m and m["running"]:
         summary += " · maintenance running"
+    sleeps_in = max(0.0, sleeps_at - now) if sleeps_at else None
+    if state == "running":
+        if reason:
+            kind = "kept"
+        elif svc.active or svc.busy_now:
+            kind = "in_use"
+        elif sleeps_in:
+            kind = "countdown"
+        else:
+            kind = "ready"          # no idle timer ("only when I say so"), or the timer has just run out
+    else:
+        kind = {"sleeping": "sleeping", "starting": "waking", "stopping": "stopping", "failed": "failed"}.get(
+            state, "updating")      # updating / maintenance
     return {
         "name": svc.name,
         "container": svc.container,
@@ -1576,6 +1623,9 @@ def app_status(svc: "Service") -> dict:
         "update_available": upd.get("status") == "update" and upd.get("remote") != svc.update_skip,
         "link_port": svc.link_port,
         "maintenance": m,
+        "idle_timeout": svc.idle_timeout,
+        "sleeps_in": round(sleeps_in) if sleeps_in is not None else None,
+        **indicator(kind, sleeps_in),
     }
 
 
@@ -1595,7 +1645,8 @@ async def container_status(name: str):
     elif m["next_restart_text"]:
         summary += f" · restart {m['next_restart_text']}"
     return {"name": name, "container": name, "controlled": False, "state": "running" if running else "stopped",
-            "running": running, "summary": summary, "wake_blocked": False, "maintenance": m}
+            "running": running, "summary": summary, "wake_blocked": False, "maintenance": m,
+            **indicator("updating" if m["running"] else "running" if running else "stopped")}
 
 # --------------------------------------------------------------------------
 # Scheduled maintenance: restart containers on a schedule, optionally updating
@@ -2952,6 +3003,10 @@ async def heimdall_tile(body: HeimdallTileIn):
             log.warning("Heimdall tile for %s: %s", item["name"], out.strip()[-500:])
             raise HTTPException(500, f"Heimdall couldn't save the tile: {out.strip()[-300:] or 'no details'}")
 
+    # Bring the tile type's code up to date first (e.g. after a Stowaway update).
+    current, _ = await dk.get_archive(body.container, f"{apps_dir}/Stowaway/Stowaway.php")
+    if current is not None and current != (HEIMDALL_APP / "Stowaway.php").read_bytes():
+        await heimdall_install(HeimdallIn({"container": body.container}))
     r = await run()
     if r.get("result") == "not_registered":
         await heimdall_install(HeimdallIn({"container": body.container}))      # first time: add the tile type
@@ -3163,6 +3218,14 @@ async def homarr_app(name: str, link: str = ""):
     mid = dashsetup.homarr_match(apps, svc.name, link) if link else None
     match = next(({k: a.get(k) for k in ("id", "name", "href", "pingUrl")} for a in apps if a["id"] == mid), None)
     return {"configured": True, "url": url, "match": match}
+
+
+@admin.get("/api/homarr/widget")
+async def homarr_widget(base: str):
+    """The "Stowaway status" custom widget for Homarr, to import once."""
+    data = json.dumps(dashsetup.homarr_widget(dash_base(base)), indent=2)
+    return Response(data, media_type="application/json",
+                    headers={"Content-Disposition": 'attachment; filename="stowaway-status-widget.json"'})
 
 
 class HomarrAddIn(BaseModel):

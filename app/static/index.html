@@ -1695,6 +1695,14 @@ function pickedApps() {
   return [...document.querySelectorAll('#dashSetup input[data-pick]:checked')]
     .map(cb => setupApps().find(i => i.name === cb.dataset.pick)).filter(Boolean).map(i => ({ name: i.name, link: i.link }));
 }
+function homarrWidgetHtml(i) {
+  return `<h3 style="margin-top:6px">Status widget</h3>
+    <p class="hint" style="margin:0">Shows <b>In Use</b>, <b>Sleeping in 8 min</b>, <b>Ready to Sleep</b> or <b>Sleeping</b> for an app, in colour (<i>Waking up</i>, <i>Going to sleep</i>, <i>Updating</i> or <i>Kept awake</i> in between). Needs a Homarr version that has <b>Manage → Custom widgets</b>.</p>
+    <ol class="steps" style="margin:0">
+      <li>Once: <a class="btn" href="${API}/homarr/widget?base=${encodeURIComponent(intSB)}" download="stowaway-status-widget.json">Download the widget</a>, then in Homarr go to <b>Manage → Custom widgets → Import</b> and choose the file.</li>
+      <li>Edit a board, add the <b>Stowaway status</b> widget, and in its settings set <b>App name</b> to <code>${esc(i ? i.name : 'your app')}</code>. Add one widget per app.</li>
+    </ol>`;
+}
 async function loadHomarrSetup() {
   const box = $('dashSetup'), i = intItem();
   let h = '<h3>Add to Homarr</h3>';
@@ -1708,7 +1716,7 @@ async function loadHomarrSetup() {
   if (!$('dashSetup') || intTab !== 'homarr' || intItem() !== i) return;
   if (!r.configured) {
     box.innerHTML = h + `<p class="hint" style="margin:0">Enter Homarr's address and an API key in Settings once; then each app can be added to Homarr from here with one click.</p>
-      <div><button type="button" id="hoSettings">Open Settings</button></div>`;
+      <div><button type="button" id="hoSettings">Open Settings</button></div>` + homarrWidgetHtml(i);
     return;
   }
   const m = r.match;
@@ -1716,7 +1724,7 @@ async function loadHomarrSetup() {
     ? `<p class="hint" style="margin:0">Homarr already has <b>${esc(m.name)}</b>${m.href ? ` (${esc(m.href)})` : ''}. This keeps its name and icon, points it at ${esc(i.name)}'s Stowaway link and sets its Ping URL, so the dot shows whether it's awake.</p>`
     : `<p class="hint" style="margin:0">Adds ${esc(i.name)} to Homarr's apps with its Stowaway link and a Ping URL, so the dot shows whether it's awake. Then place it on a board with an App widget.</p>`;
   h += `<div><button type="button" class="primary" id="hoAdd">${m ? `Update ${esc(i.name)} in Homarr` : `Add ${esc(i.name)} to Homarr`}</button></div>
-    <div id="dsMsg" class="hint" style="margin:0"></div>`;
+    <div id="dsMsg" class="hint" style="margin:0"></div>` + homarrWidgetHtml(i);
   box.innerHTML = h;
 }
 async function loadDashSetup(kind) {
@@ -1870,11 +1878,7 @@ function renderInt() {
   if (intTab === 'homarr') {
     h = `<ol class="steps">
       <li>Edit the <b>${esc(n)}</b> app in Homarr. Set <b>URL</b> to <code>${esc(link)}</code> and <b>Ping URL</b> to <code>${esc(dot)}</code>.<br><span class="hint">The dot is <b>green while awake</b> and <b>red while asleep</b>. Red here means asleep, not broken. Homarr checks every minute, and this never wakes the app. Don't leave Ping URL empty: Homarr would then check the app's own link, which wakes it every minute and keeps it awake.</span></li>
-      <li>For more detail (Homarr 1.65 or newer): <b>Manage → Custom widgets → New</b>. URL <code>${esc(st)}</code>, method GET, no authentication.
-        <ul><li><b>Status indicator</b>: JSONPath <code>$.state</code>, good values <code>running</code>.</li>
-            <li><b>Single value</b>: <code>$.summary</code> (shows e.g. "Awake · sleeps in 8 min · restart Sun 4:00 AM").</li>
-            ${i.controlled ? `<li>Optional <b>Action button</b> "Wake": POST <code>${esc(wake)}</code>, authentication <b>API key header</b> with name <code>X-Stowaway</code> and value <code>1</code>.</li>` : ''}</ul></li>
-      <li>Add the widget to your board.</li></ol>`;
+      <li>For the status in words (In Use, Sleeping in 8 min, Ready to Sleep, Sleeping), use the <b>Status widget</b> above.</li></ol>`;
   } else if (intTab === 'homepage') {
     const code = `- ${yamlKey(n)}:
     href: ${link}
@@ -1885,19 +1889,8 @@ function renderInt() {
       url: ${st}
       refreshInterval: 15000
       mappings:
-        - field: state
-          label: Status
-          remap:
-            - value: running
-              to: Awake
-            - value: sleeping
-              to: Asleep
-            - value: starting
-              to: Starting
-            - any: true
-              to: Working
-        - field: maintenance.next_restart_text
-          label: Restart`;
+        - field: indicator
+          label: Status`;
     h = codeBlock(code, `Add to <code>services.yaml</code> under a group. The monitor shows a red mark while ${esc(n)} is asleep.`);
   } else if (intTab === 'dashy') {
     const code = `- title: ${n}
@@ -1920,11 +1913,17 @@ function renderInt() {
   template: |
     <ul class="list list-gap-10 collapsible-container" data-collapse-after="8">
     {{ range .JSON.Array "apps" }}
-      <li><span class="color-highlight">{{ .String "name" }}</span>
-        <span class="color-subdue">{{ .String "summary" }}</span></li>
+      <li class="flex justify-between items-center gap-10"><span class="color-highlight">{{ .String "name" }}</span>
+        {{ if eq (.String "indicator_color") "green" }}<span style="color: hsl(134, 50%, 60%); font-weight: 600">{{ .String "indicator" }}</span>
+        {{ else if eq (.String "indicator_color") "yellow" }}<span style="color: hsl(45, 95%, 55%); font-weight: 600">{{ .String "indicator" }}</span>
+        {{ else if eq (.String "indicator_color") "orange" }}<span style="color: hsl(27, 98%, 58%); font-weight: 600">{{ .String "indicator" }}</span>
+        {{ else if eq (.String "indicator_color") "teal" }}<span style="color: hsl(162, 75%, 45%); font-weight: 600">{{ .String "indicator" }}</span>
+        {{ else if eq (.String "indicator_color") "blue" }}<span style="color: hsl(207, 90%, 63%); font-weight: 600">{{ .String "indicator" }}</span>
+        {{ else if eq (.String "indicator_color") "red" }}<span style="color: hsl(0, 94%, 65%); font-weight: 600">{{ .String "indicator" }}</span>
+        {{ else }}<span class="color-subdue">{{ .String "indicator" }}</span>{{ end }}</li>
     {{ end }}
     </ul>`;
-    h = codeBlock(code, 'Add to a column in <code>glance.yml</code>. The second widget lists every app with its state and next restart.');
+    h = codeBlock(code, 'Add to a column in <code>glance.yml</code>. The second widget lists every app with its status (In Use, Sleeping in 8 min, Ready to Sleep, Sleeping…), in colour.');
   } else if (intTab === 'heimdall') {
     h = `<div class="section" id="hmTile" style="border-top:0;padding-top:0"><h3>Add to Heimdall</h3><span class="hint">Looking for Heimdall…</span></div>
       <div class="section"><h3>Or by hand</h3><ol class="steps">

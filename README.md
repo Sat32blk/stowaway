@@ -272,15 +272,29 @@ Use each app's link port as the tile's URL; clicking it wakes the app. Click **I
 
 | Address | What it gives |
 |---|---|
-| `http://<server>:8880/_stowaway/status/<app>` | JSON: `state`, a one-line `summary` like "Awake · sleeps in 8 min · restart Sun 4:00 AM", `sleeps_at`, keep-awake, "don't wake" and next/last scheduled restart. Never wakes the app. |
+| `http://<server>:8880/_stowaway/status/<app>` | JSON: `state`, the status label (`indicator`, see below) with its colour and icon, a one-line `summary`, `sleeps_at`/`sleeps_in`, keep-awake, "don't wake" and next/last scheduled restart. Never wakes the app. |
 | `…/status/<app>?code=1` | The same, but **HTTP 503 while the app is asleep**, so a dashboard's status dot shows green when awake and red when asleep. |
 | `…/_stowaway/status` | Every app in one list (dashboard port only, home network only by default). |
 
-- **Homarr:** set the app's *Ping URL* to the `?code=1` address. Homarr 1.65+ can also show the summary and a **Wake** button with a Custom API widget.
-- **Homepage:** `siteMonitor` with the `?code=1` address, plus a `customapi` widget showing the state and next restart.
-- **Dashy:** `statusCheckUrl` with the `?code=1` address.
-- **Glance:** a `monitor` widget with `check-url`, and a `custom-api` widget listing every app.
-- **Heimdall:** has no status dot for ordinary tiles. The **Stowaway** tile type shows Awake/Asleep and the next restart instead. In **Integrations → Heimdall**, **Add *app* to Heimdall** creates the tile with the app's own icon (from the [dashboard-icons](https://github.com/homarr-labs/dashboard-icons) collection), its Stowaway link and the status switched on; if you already have a tile for the app, that one is converted and keeps its title and icon. Works with the linuxserver Heimdall image; by hand, see `heimdall/README.md`.
+**Status labels.** Dashboards that can show text get one clear label per app:
+
+| Label | Colour | When |
+|---|---|---|
+| **In Use** | green | someone is connected, or the app is busy (a transcode, a download) |
+| **Sleeping in 8 min** | yellow | awake and idle; counts down to sleep |
+| **Ready to Sleep** | orange | awake with nothing to do: an "Only when I say so" app, or the timer has just run out |
+| **Sleeping** | grey | asleep; opening it wakes it |
+| *Waking up*, *Going to sleep*, *Updating* | blue | for the moments in between |
+| *Kept awake* | teal | you asked Stowaway to keep it awake (or it's within its awake hours) |
+| *Failed to start* | red | the last wake didn't work |
+
+The status JSON carries it as `indicator`, `indicator_color` (a colour name), `indicator_hex` and `indicator_icon` (a Tabler icon name), so any dashboard or script can show the same thing.
+
+- **Homarr:** the app tile's *Ping URL* is the `?code=1` address (green/red dot). For the label, import the **Stowaway status** custom widget once (download it from **Integrations → Homarr**, then *Manage → Custom widgets → Import*), add it to a board and set **App name**. It shows the label in colour, with a bar counting down to sleep.
+- **Homepage:** `siteMonitor` with the `?code=1` address (green/red), plus a `customapi` widget showing the label. It refreshes every 15 seconds, so the countdown keeps up.
+- **Dashy:** `statusCheckUrl` with the `?code=1` address. Dashy can only show a dot: green while awake, red while asleep.
+- **Glance:** a `monitor` widget with `check-url` (green/red), and a `custom-api` widget listing every app with its label in colour. Glance updates it when the page is loaded.
+- **Heimdall:** has no status dot for ordinary tiles. The **Stowaway** tile type shows the label in colour instead and refreshes itself. In **Integrations → Heimdall**, **Add *app* to Heimdall** creates the tile with the app's own icon (from the [dashboard-icons](https://github.com/homarr-labs/dashboard-icons) collection), its Stowaway link and the status switched on; if you already have a tile for the app, that one is converted and keeps its title and icon. Works with the linuxserver Heimdall image; by hand, see `heimdall/README.md`. Clicking **Add *app* to Heimdall** also updates the tile type in Heimdall after a Stowaway update.
 
 **Let Stowaway set it up.** Nothing changes in a dashboard until you click its button in the Integrations window.
 

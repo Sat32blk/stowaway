@@ -4,8 +4,8 @@ namespace App\SupportedApps\Stowaway;
 
 /**
  * Stowaway puts Docker containers to sleep when they're idle and wakes them
- * when someone opens their link. This tile shows whether the app is awake and
- * when its next scheduled restart is, using Stowaway's public status address
+ * when someone opens their link. This tile shows the app's status (In Use,
+ * Sleeping in 8 min, Ready to Sleep, Sleeping...), using Stowaway's public status address
  * (which never wakes the app).
  *
  * Set the tile's URL to the app's Stowaway link (e.g. http://192.168.1.2:18096).
@@ -40,25 +40,18 @@ class Stowaway extends \App\SupportedApps implements \App\EnhancedApps
     public function livestats()
     {
         $status = "inactive";
-        $data = ["state" => "Unknown", "restart" => "None"];
+        $data = ["state" => "Unknown", "color" => "#909296"];
 
         $response = parent::execute($this->url());
         if ($response !== null && $response->getStatusCode() === 200) {
             $details = json_decode($response->getBody(), true);
             if (is_array($details) && isset($details["state"])) {
                 $state = $details["state"];
-                $label = self::LABELS[$state] ?? ucfirst($state);
-                if ($state === "sleeping" && !empty($details["wake_blocked"])) {
-                    $label = "Switched off";
-                }
-                $data["state"] = $label;
-                $maintenance = $details["maintenance"] ?? null;
-                if (is_array($maintenance)) {
-                    if (!empty($maintenance["running"])) {
-                        $data["restart"] = "Now";
-                    } elseif (!empty($maintenance["next_restart_text"])) {
-                        $data["restart"] = $maintenance["next_restart_text"];
-                    }
+                // Stowaway 1.5+ sends a ready-made label ("In Use", "Sleeping in 8 min",
+                // "Ready to Sleep", "Sleeping"...) and its colour.
+                $data["state"] = $details["indicator"] ?? (self::LABELS[$state] ?? ucfirst($state));
+                if (isset($details["indicator_hex"]) && preg_match('/^#[0-9a-fA-F]{6}$/', $details["indicator_hex"])) {
+                    $data["color"] = $details["indicator_hex"];
                 }
                 // Refresh more often while something is changing.
                 if (in_array($state, ["starting", "stopping", "updating", "maintenance"], true)) {
