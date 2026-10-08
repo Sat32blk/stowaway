@@ -11,6 +11,7 @@
   <Project>https://github.com/Sat32blk/Stowaway</Project>
   <Overview>Starts containers when someone opens their link and puts them back to sleep when idle. Also schedules restarts and updates. Web dashboard on port 8880.</Overview>
   <Category>Tools: Network:Management</Category>
+  <Icon>https://raw.githubusercontent.com/Sat32blk/Stowaway/main/docs/icon.png</Icon>
   <WebUI>http://[IP]:8880/_stowaway</WebUI>
   <ExtraParams>--cap-add=NET_ADMIN</ExtraParams>
   <Config Name="Config" Target="/config" Default="/mnt/user/appdata/stowaway" Mode="rw" Description="Settings, certificates and your account" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/stowaway</Config>

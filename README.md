@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/icon.svg" width="112" alt="Stowaway icon"></p>
+
 # Stowaway
 
 [![Docker image](https://github.com/Sat32blk/Stowaway/actions/workflows/docker-image.yml/badge.svg)](https://github.com/Sat32blk/Stowaway/actions/workflows/docker-image.yml)

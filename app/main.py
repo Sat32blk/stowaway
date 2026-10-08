@@ -3004,8 +3004,12 @@ async def heimdall_tile(body: HeimdallTileIn):
             raise HTTPException(500, f"Heimdall couldn't save the tile: {out.strip()[-300:] or 'no details'}")
 
     # Bring the tile type's code up to date first (e.g. after a Stowaway update).
-    current, _ = await dk.get_archive(body.container, f"{apps_dir}/Stowaway/Stowaway.php")
-    if current is not None and current != (HEIMDALL_APP / "Stowaway.php").read_bytes():
+    outdated = False
+    for fname in ("Stowaway.php", "stowaway.svg"):
+        current, _ = await dk.get_archive(body.container, f"{apps_dir}/Stowaway/{fname}")
+        if current is not None and current != (HEIMDALL_APP / fname).read_bytes():
+            outdated = True
+    if outdated:
         await heimdall_install(HeimdallIn({"container": body.container}))
     r = await run()
     if r.get("result") == "not_registered":

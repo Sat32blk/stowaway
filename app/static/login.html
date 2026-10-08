@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2215%22 fill=%22%2314171f%22/%3E%3Crect x=%22.75%22 y=%22.75%22 width=%2262.5%22 height=%2262.5%22 rx=%2214.5%22 fill=%22none%22 stroke=%22%232c3240%22 stroke-width=%221.5%22/%3E%3Cg fill=%22none%22 stroke=%22%23f1f5f9%22 stroke-width=%223%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%2217%22 y=%228%22 width=%2237%22 height=%2248%22 rx=%223%22/%3E%3Cpath d=%22M17 17.6H54M17 27.2H54M17 36.8H54M17 46.4H54%22/%3E%3C/g%3E%3Ccircle cx=%2246%22 cy=%2212.8%22 r=%223.99%22 fill=%22%23ff3b3b%22 opacity=%22.35%22/%3E%3Ccircle cx=%2246%22 cy=%2212.8%22 r=%222.1%22 fill=%22%23ff3b3b%22/%3E%3Ccircle cx=%2246%22 cy=%2222.4%22 r=%223.99%22 fill=%22%23ff3b3b%22 opacity=%22.35%22/%3E%3Ccircle cx=%2246%22 cy=%2222.4%22 r=%222.1%22 fill=%22%23ff3b3b%22/%3E%3Ccircle cx=%2246%22 cy=%2241.6%22 r=%223.99%22 fill=%22%23ff3b3b%22 opacity=%22.35%22/%3E%3Ccircle cx=%2246%22 cy=%2241.6%22 r=%222.1%22 fill=%22%23ff3b3b%22/%3E%3Ccircle cx=%2246%22 cy=%2251.2%22 r=%223.99%22 fill=%22%23ff3b3b%22 opacity=%22.35%22/%3E%3Ccircle cx=%2246%22 cy=%2251.2%22 r=%222.1%22 fill=%22%23ff3b3b%22/%3E%3Crect x=%225%22 y=%2229.3%22 width=%2233%22 height=%225.4%22 rx=%221.6%22 fill=%22%23ffffff%22/%3E%3Ccircle cx=%2233%22 cy=%2232%22 r=%222.99%22 fill=%22%2305060a%22/%3E%3Ccircle cx=%2233%22 cy=%2232%22 r=%222.27%22 fill=%22%2322ff66%22/%3E%3C/svg%3E">
 <title>Stowaway</title>
 <style>
 :root {
@@ -47,9 +48,8 @@ body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding
   -webkit-backdrop-filter: blur(22px) saturate(170%); backdrop-filter: blur(22px) saturate(170%);
   animation: rise .45s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes rise { from { opacity: 0; transform: translateY(12px) scale(.98); } }
-.logo { width: 48px; height: 48px; border-radius: 15px; background: var(--grad); display: grid; place-items: center;
-  margin: 0 auto 16px; box-shadow: 0 8px 22px rgb(99 102 241 / .38), inset 0 1px 0 rgb(255 255 255 / .35); }
-.logo svg { width: 24px; height: 24px; }
+.logo { width: 48px; height: 48px; border-radius: 15px; display: grid; margin: 0 auto 16px; box-shadow: 0 8px 22px rgb(0 0 0 / .35); }
+.logo svg { width: 100%; height: 100%; display: block; }
 h1 { font-size: 22px; letter-spacing: -0.02em; margin: 0 0 4px; text-align: center; }
 h1 span { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .lead { color: var(--muted); text-align: center; margin: 0 0 22px; font-size: 14px; }
@@ -86,7 +86,7 @@ button.primary:active:not(:disabled) { transform: translateY(1px); }
 <div class="bg" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 
 <main class="card">
-  <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 7.2a8 8 0 1 0 11.4 0"/></svg></div>
+  <div class="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#14171f"/><rect x=".75" y=".75" width="62.5" height="62.5" rx="14.5" fill="none" stroke="#2c3240" stroke-width="1.5"/><g fill="none" stroke="#f1f5f9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="17" y="8" width="37" height="48" rx="3"/><path d="M17 17.6H54M17 27.2H54M17 36.8H54M17 46.4H54"/></g><circle cx="46" cy="12.8" r="3.99" fill="#ff3b3b" opacity=".35"/><circle cx="46" cy="12.8" r="2.1" fill="#ff3b3b"/><circle cx="46" cy="22.4" r="3.99" fill="#ff3b3b" opacity=".35"/><circle cx="46" cy="22.4" r="2.1" fill="#ff3b3b"/><circle cx="46" cy="41.6" r="3.99" fill="#ff3b3b" opacity=".35"/><circle cx="46" cy="41.6" r="2.1" fill="#ff3b3b"/><circle cx="46" cy="51.2" r="3.99" fill="#ff3b3b" opacity=".35"/><circle cx="46" cy="51.2" r="2.1" fill="#ff3b3b"/><rect x="5" y="29.3" width="33" height="5.4" rx="1.6" fill="#ffffff"/><circle cx="33" cy="32" r="2.99" fill="#05060a"/><circle cx="33" cy="32" r="2.27" fill="#22ff66"/></svg></div>
 
   <!-- first visit -->
   <section id="setup" hidden>
