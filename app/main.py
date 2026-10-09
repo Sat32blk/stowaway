@@ -3250,6 +3250,7 @@ class HeimdallTileIn(BaseModel):
     name: str
     link: str
     base: str
+    tag: int | None = None          # Heimdall tag (category/folder) id; 0 = home dashboard
 
 
 @admin.post("/api/heimdall/tile")
@@ -3291,7 +3292,9 @@ async def heimdall_tile(body: HeimdallTileIn):
                      "the Stowaway icon; upload the app's icon in the tile to change it.")
     params = {"name": item["name"], "title": "Stowaway" if item["name"] == SELF else item["name"][:1].upper() + item["name"][1:],
               "link": item["link"],
-              "dashboard": dashboard, "icon": icon_value}
+              "dashboard": dashboard, "icon": icon_value, "tag": body.tag}
+    if body.tag is not None:
+        reg.settings.setdefault("dash_apps", {})["heimdall_tag"] = body.tag
     script, pfile = f"{apps_dir}/Stowaway/.stowaway-tile.php", f"{apps_dir}/Stowaway/.stowaway-tile.json"
 
     async def run():
@@ -3680,6 +3683,57 @@ if ($fixed) {
 """
 
 
+HEIMDALL_INFO_PHP = r"""<?php
+// Lists Heimdall's tags (categories/folders) and how the dashboard groups tiles,
+// so a new tile can go somewhere it's shown. Prints one JSON line.
+require '/app/www/vendor/autoload.php';
+$app = require '/app/www/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$user = App\User::where('public_front', true)->first() ?? App\User::orderBy('id')->first();
+$mode = 'folders';
+$s = App\Setting::where('key', 'treat_tags_as')->first();
+if ($s) {
+    $mode = (string) $s->value;
+    if ($user && !(bool) $s->system) {
+        $u = Illuminate\Support\Facades\DB::table('setting_user')->where('user_id', $user->id)->where('setting_id', $s->id)->first();
+        if ($u && $u->uservalue !== null && $u->uservalue !== '') {
+            $mode = (string) $u->uservalue;
+        }
+    }
+}
+$tags = App\Item::withoutGlobalScope('user_id')->where('type', 1)->where('id', '!=', 0)->orderBy('order')->orderBy('title')->get(['id', 'title']);
+// Where each Stowaway tile is now, by app name ("*" is Stowaway's own tile).
+$tiles = [];
+$f = app_path('SupportedApps/Stowaway/app.json');
+if (is_file($f)) {
+    $appid = json_decode(file_get_contents($f))->appid ?? null;
+    foreach (App\Item::withoutGlobalScope('user_id')->where('type', 0)->where('appid', $appid)->get() as $i) {
+        $c = json_decode($i->description ?: '{}');
+        if (isset($c->app)) {
+            $tiles[strtolower((string) $c->app)] = $i->parents()->pluck('items.id')->map(fn ($v) => (int) $v)->values();
+        }
+    }
+}
+echo json_encode(['mode' => $mode, 'tags' => $tags->map(fn ($t) => ['id' => $t->id, 'title' => $t->title])->values(), 'tiles' => (object) $tiles]), "\n";
+"""
+
+
+async def heimdall_info(container: str) -> dict:
+    """Heimdall's grouping mode and tags, or {} if it can't be read."""
+    if DEMO:
+        return {"mode": "categories", "tags": [{"id": 19, "title": "Servers"}, {"id": 22, "title": "Media Servers"}],
+                "tiles": {n: [22] for n in (reg.settings.get("dash_apps") or {}).get("heimdall") or []}}
+    with contextlib.suppress(Exception):
+        apps_dir, _ = await heimdall_paths(container)
+        script = f"{apps_dir}/.stowaway-info.php"
+        await driver.dk.put_archive(container, apps_dir, dashsetup.tar_one(script, HEIMDALL_INFO_PHP.encode(), None))
+        code, out = await driver.dk.exec_run(container, ["php", script], user="abc")
+        await driver.dk.exec_run(container, ["rm", "-f", script])
+        line = next((l for l in reversed(out.splitlines()) if l.strip().startswith("{")), "")
+        return json.loads(line) if line else {}
+    return {}
+
+
 async def heimdall_containers() -> list[dict]:
     if DEMO:
         return [{"name": "heimdall", "running": True}]
@@ -3730,6 +3784,9 @@ if ($item) {
         'description' => $config,
         'icon' => $keep ? $item->icon : ($p->icon ?: $application->icon),
     ]);
+    if (isset($p->tag) && $p->tag !== null) {
+        $item->parents()->syncWithoutDetaching([(int) $p->tag]);
+    }
     echo json_encode(['result' => 'updated', 'title' => $item->title, 'kept_icon' => $keep]), "\n";
 } else {
     $user = App\User::where('public_front', true)->first() ?? App\User::orderBy('id')->first();
@@ -3746,7 +3803,7 @@ if ($item) {
         'appid' => $details->appid,
         'user_id' => $user ? $user->id : 0,
     ]);
-    $item->parents()->sync([0]);
+    $item->parents()->sync([isset($p->tag) && $p->tag !== null ? (int) $p->tag : 0]);
     echo json_encode(['result' => 'created', 'title' => $item->title]), "\n";
 }
 """
@@ -3770,7 +3827,12 @@ class HeimdallIn(BaseModel):
 
 @admin.get("/api/heimdall")
 async def heimdall_list():
-    return {"containers": await heimdall_containers(), "available": HEIMDALL_APP.is_dir() or DEMO}
+    cs = await heimdall_containers()
+    for c in cs:
+        if c["running"]:
+            c.update(await heimdall_info(c["name"]))
+    return {"containers": cs, "available": HEIMDALL_APP.is_dir() or DEMO,
+            "last_tag": (reg.settings.get("dash_apps") or {}).get("heimdall_tag")}
 
 
 @admin.post("/api/heimdall/install")

@@ -2161,6 +2161,24 @@ async function loadHomarrRow(i) {
   setRow('homarr', m ? `On your Homarr as “${esc(m.name)}”${m.pingUrl ? ', with its status dot' : ''}` : 'Not added yet',
     `${widget}<button type="button" class="${m ? '' : 'primary'}" data-d="homarr">${m ? 'Update in Homarr' : 'Add to Homarr'}</button>`, !!m);
 }
+// Heimdall: which category/folder a tile goes in. In categories view Heimdall only
+// shows tiles that are in a category, so "Home dashboard" isn't offered there.
+function heimdallTagPick(r, running, app) {
+  const c = running[0], tags = c.tags || [], mode = c.mode || 'folders';
+  if (!c.mode) return '';
+  const word = mode === 'categories' ? 'Category' : mode === 'tags' ? 'Tag' : 'Folder';
+  const cur = (c.tiles || {})[app.toLowerCase()];
+  const visible = cur && cur.some(t => mode !== 'categories' || t !== 0);
+  const opts = [];
+  if (visible) opts.push(['', 'Keep where it is']);
+  if (mode !== 'categories' || !tags.length) opts.push(['0', 'Home dashboard']);
+  for (const t of tags) opts.push([String(t.id), t.title]);
+  let sel = visible ? '' : (r.last_tag != null && opts.some(o => o[0] === String(r.last_tag)) ? String(r.last_tag)
+    : (mode === 'categories' && tags.length ? String(tags[0].id) : '0'));
+  return `<select data-tag aria-label="Heimdall ${word.toLowerCase()}" title="${word} in Heimdall">${opts.map(([v, l]) =>
+    `<option value="${v}"${v === sel ? ' selected' : ''}>${v && v !== '0' ? word + ': ' : ''}${esc(l)}</option>`).join('')}</select>`;
+}
+const tagOf = row => { const t = row && row.querySelector('[data-tag]'); return t && t.value !== '' ? Number(t.value) : null; };
 async function loadHeimdallRow(i) {
   let r;
   try { r = await api('/heimdall'); } catch (e) { return setRow('heimdall', esc(e.message)); }
@@ -2169,7 +2187,7 @@ async function loadHeimdallRow(i) {
   if (!r.containers.length) return setRow('heimdall', 'No Heimdall container found on this server.');
   if (!running.length) return setRow('heimdall', `Start ${esc(r.containers[0].name)} first.`);
   const on = (dashApps.heimdall || []).includes(i.name);
-  const pick = running.length > 1 ? `<select data-cont aria-label="Heimdall container">${running.map(c => `<option>${esc(c.name)}</option>`).join('')}</select>` : `<input type="hidden" data-cont value="${esc(running[0].name)}">`;
+  const pick = (running.length > 1 ? `<select data-cont aria-label="Heimdall container">${running.map(c => `<option>${esc(c.name)}</option>`).join('')}</select>` : `<input type="hidden" data-cont value="${esc(running[0].name)}">`) + heimdallTagPick(r, running, i.name);
   setRow('heimdall', on ? 'Tile added: it shows the status, with the app\'s own icon' : 'Not added yet. Adds a tile with its own icon and status.',
     `${pick}<button type="button" class="${on ? '' : 'primary'}" data-d="heimdall">${on ? 'Update tile' : 'Add to Heimdall'}</button>`, on);
 }
@@ -2208,7 +2226,7 @@ $('dashList').addEventListener('click', async (e) => {
       r = await api('/homarr/add', { method: 'POST', body: JSON.stringify({ name: i.name, link: i.link, base: sbFor('homarr') }) });
       msg.innerHTML = `<b>${esc(r.message)}</b> The dot updates within a minute.`;
     } else if (kind === 'heimdall') {
-      r = await api('/heimdall/tile', { method: 'POST', body: JSON.stringify({ container: cont, name: i.name, link: i.link, base: sbFor('heimdall') }) });
+      r = await api('/heimdall/tile', { method: 'POST', body: JSON.stringify({ container: cont, name: i.name, link: i.link, base: sbFor('heimdall'), tag: tagOf(row) }) });
       msg.innerHTML = `<b>${esc(r.message)}</b> Reload Heimdall to see it.`;
     } else {
       // Homepage and Glance get one block with every app added from here, so keep the others.
@@ -2475,7 +2493,7 @@ async function loadSelf(st) {
     const running = r.containers.filter(c => c.running);
     if (!r.containers.length) return setSelfRow('heimdall', 'No Heimdall container found on this server.');
     if (!running.length) return setSelfRow('heimdall', `Start ${esc(r.containers[0].name)} first.`);
-    const pick = running.length > 1 ? `<select data-cont aria-label="Heimdall container">${running.map(c => `<option>${esc(c.name)}</option>`).join('')}</select>` : `<input type="hidden" data-cont value="${esc(running[0].name)}">`;
+    const pick = (running.length > 1 ? `<select data-cont aria-label="Heimdall container">${running.map(c => `<option>${esc(c.name)}</option>`).join('')}</select>` : `<input type="hidden" data-cont value="${esc(running[0].name)}">`) + heimdallTagPick(r, running, '*');
     setSelfRow('heimdall', has('heimdall') ? 'On your Heimdall: the Stowaway tile shows the summary' : 'Not added yet. Adds a Stowaway tile showing the summary.',
       `${pick}<button type="button" class="${has('heimdall') ? '' : 'primary'}" data-s="heimdall">${has('heimdall') ? 'Update tile' : 'Add to Heimdall'}</button>`, has('heimdall'));
   })();
@@ -2503,7 +2521,7 @@ $('selfList').addEventListener('click', async (e) => {
       r = await api('/homarr/add', { method: 'POST', body: JSON.stringify({ name: '*', link: SELF_LINK, base: sbFor('homarr') }) });
       msg.innerHTML = `<b>${esc(r.message)}</b> For the numbers, import the summary widget and add it to a board.`;
     } else if (kind === 'heimdall') {
-      r = await api('/heimdall/tile', { method: 'POST', body: JSON.stringify({ container: cont, name: '*', link: SELF_LINK, base: sbFor('heimdall') }) });
+      r = await api('/heimdall/tile', { method: 'POST', body: JSON.stringify({ container: cont, name: '*', link: SELF_LINK, base: sbFor('heimdall'), tag: tagOf(row) }) });
       msg.innerHTML = `<b>${esc(r.message)}</b> Reload Heimdall to see it.`;
     } else {
       const apps = (dashApps[kind] || []).filter(n => n !== '*').map(n => services.find(s => s.name === n)).filter(s => s && linksFor(s)[0])
