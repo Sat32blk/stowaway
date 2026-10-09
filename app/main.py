@@ -1769,7 +1769,7 @@ def maint_brief(container: str):
 INDICATORS = {
     "in_use": ("In Use", "green", "#40c057", "activity"),
     "countdown": ("Sleeping in {}", "yellow", "#fab005", "clock"),
-    "ready": ("Ready to Sleep", "orange", "#fd7e14", "power"),
+    "ready": ("Idle", "orange", "#fd7e14", "power"),
     "sleeping": ("Sleeping", "gray", "#909296", "moon"),
     "kept": ("Kept awake", "teal", "#12b886", "lock"),
     "waking": ("Waking up", "blue", "#4dabf7", "sun"),

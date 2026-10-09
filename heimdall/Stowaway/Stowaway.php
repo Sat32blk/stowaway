@@ -5,7 +5,7 @@ namespace App\SupportedApps\Stowaway;
 /**
  * Stowaway puts Docker containers to sleep when they're idle and wakes them
  * when someone opens their link. This tile shows the app's status (In Use,
- * Sleeping in 8 min, Ready to Sleep, Sleeping...), using Stowaway's public status address
+ * Sleeping in 8 min, Idle, Sleeping...), using Stowaway's public status address
  * (which never wakes the app).
  *
  * Set the tile's URL to the app's Stowaway link (e.g. http://192.168.1.2:18096).
@@ -60,7 +60,7 @@ class Stowaway extends \App\SupportedApps implements \App\EnhancedApps
             if (is_array($details) && isset($details["state"])) {
                 $state = $details["state"];
                 // Stowaway 1.5+ sends a ready-made label ("In Use", "Sleeping in 8 min",
-                // "Ready to Sleep", "Sleeping"...) and its colour.
+                // "Idle", "Sleeping"...) and its colour.
                 $data["state"] = $details["indicator"] ?? (self::LABELS[$state] ?? ucfirst($state));
                 if (isset($details["indicator_hex"]) && preg_match('/^#[0-9a-fA-F]{6}$/', $details["indicator_hex"])) {
                     $data["color"] = $details["indicator_hex"];

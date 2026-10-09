@@ -240,7 +240,7 @@ def homarr_widget(base: str) -> dict:
     return {
         "$schema": "homarr-custom-widget-v2",
         "name": "Stowaway status",
-        "description": "Shows whether an app Stowaway manages is In Use, Sleeping in a few minutes, Ready to Sleep or Sleeping. Checking never wakes the app.",
+        "description": "Shows whether an app Stowaway manages is In Use, Sleeping in a few minutes, Idle or Sleeping. Checking never wakes the app.",
         "iconUrl": "https://raw.githubusercontent.com/Sat32blk/Stowaway/main/heimdall/Stowaway/stowaway.svg",
         "sources": {"default": {"name": "Stowaway", "baseUrl": base, "networkScope": scope, "auth": "none"}},
         "requests": {"status": {"path": "/status/{option:app}", "cacheSeconds": 10}},

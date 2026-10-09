@@ -22,7 +22,7 @@ Everything is managed from a web dashboard that lists every container on your se
 - **Updates:** see at a glance which containers have a newer version, install it with one click or automatically (when the app wakes, or at a scheduled restart), and go back to the old one if the new one won't start.
 - **Scheduled restarts:** restart (and optionally update) any container daily, weekly or monthly.
 - **Companion containers:** helpers like Tdarr's nodes wake and sleep with their app.
-- **Status on your dashboard:** In Use / Sleeping in 8 min / Ready to Sleep / Sleeping labels and awake/asleep dots for Homarr, Homepage, Dashy, Glance and Heimdall. Each app's settings can add it to Homarr, Homepage, Glance or Heimdall with one click, including dashboards on macvlan.
+- **Status on your dashboard:** In Use / Sleeping in 8 min / Idle / Sleeping labels and awake/asleep dots for Homarr, Homepage, Dashy, Glance and Heimdall. Each app's settings can add it to Homarr, Homepage, Glance or Heimdall with one click, including dashboards on macvlan.
 - **Fits your setup:** macvlan/ipvlan containers, HTTPS with Let's Encrypt, and a [Home Assistant integration](https://github.com/Sat32blk/Stowaway-homeassistant).
 - **Light:** about 40 MB of memory and under 0.1% of one CPU core while idle.
 
@@ -103,7 +103,7 @@ One list holds every container: the apps Stowaway manages first, then the rest. 
 | **Usage** | The app's CPU (100% = one core) and memory right now. |
 | **Last opened by** | What opened or woke it last, and when: a device (its network name if your router provides one, otherwise its browser and IP address), Home Assistant, another API client, the Wake button or its awake hours. Not tracked for apps Stowaway doesn't manage, since visits don't pass through it. |
 
-The status label next to the name is the same one dashboards get: **In Use**, **Sleeping in 8 min**, **Ready to Sleep**, **Sleeping** and so on (see [Status labels](#dashboards-homarr-homepage-dashy-glance-heimdall)). Apps with companion containers have an arrow that opens a list of them, each with its own status, CPU and memory.
+The status label next to the name is the same one dashboards get: **In Use**, **Sleeping in 8 min**, **Idle**, **Sleeping** and so on (see [Status labels](#dashboards-homarr-homepage-dashy-glance-heimdall)). Apps with companion containers have an arrow that opens a list of them, each with its own status, CPU and memory.
 
 **Settings** on a panel opens the app's settings window with tabs: **Sleep**, **Staying awake**, **Address & opening**, **Companions**, **Updates & restarts**, **Dashboards** and **Home Assistant**. Apps Stowaway doesn't manage have only **Updates & restarts**, since restarts and updates work for any container.
 
@@ -312,7 +312,7 @@ Use each app's link port as the tile's URL; clicking it wakes the app. An app's 
 |---|---|---|
 | **In Use** | green | someone is connected, or the app is busy (a transcode, a download) |
 | **Sleeping in 8 min** | yellow | awake and idle; counts down to sleep |
-| **Ready to Sleep** | orange | awake with nothing to do: an "Only when I say so" app, or the timer has just run out |
+| **Idle** | orange | awake with nothing to do: an "Only when I say so" app, or the timer has just run out |
 | **Sleeping** | grey | asleep; opening it wakes it |
 | *Waking up*, *Going to sleep*, *Updating* | blue | for the moments in between |
 | *Kept awake* | teal | you asked Stowaway to keep it awake (or it's within its awake hours) |

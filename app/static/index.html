@@ -1136,7 +1136,7 @@ function stateLabel(s) {
   let text = s.indicator || stateOf(s), color = s.indicator_color || 'gray';
   if (color === 'yellow' && s.sleeps_at) {
     const left = s.sleeps_at - (Date.now() / 1000 + offset);
-    text = left > 0 ? `Sleeping in ${fmtMins(left)}` : 'Ready to Sleep';
+    text = left > 0 ? `Sleeping in ${fmtMins(left)}` : 'Idle';
     if (left <= 0) color = 'orange';
   }
   if (s.block_wake && stateOf(s) === 'sleeping') { text = 'Switched off'; color = 'gray'; }
@@ -2129,7 +2129,7 @@ function renderDashTab() {
   const i = dashItem();
   if (!i) return;
   $('dashMsg').innerHTML = '';
-  $('dashIntro').innerHTML = `Show ${esc(i.name)}'s status (<b>In Use</b>, <b>Sleeping in 8 min</b>, <b>Ready to Sleep</b>, <b>Sleeping</b>) on your dashboard. Checking the status never wakes it.`;
+  $('dashIntro').innerHTML = `Show ${esc(i.name)}'s status (<b>In Use</b>, <b>Sleeping in 8 min</b>, <b>Idle</b>, <b>Sleeping</b>) on your dashboard. Checking the status never wakes it.`;
   const mv = ['homarr', 'homepage', 'glance', 'heimdall', 'dashy'].map(dashOnMacvlan).filter(Boolean);
   $('dashMv').innerHTML = mv.length ? (settingsCache.macvlan_shim_ip
     ? `<p class="hint" style="margin:0">${mv.map(c => `<b>${esc(c.name)}</b>`).join(', ')} ${mv.length > 1 ? 'are' : 'is'} on a macvlan network, so ${mv.length > 1 ? 'they check' : 'it checks'} Stowaway through the helper address <b>${esc(settingsCache.macvlan_shim_ip)}</b>. That's set up for you.</p>`
