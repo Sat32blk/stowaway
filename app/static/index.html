@@ -343,6 +343,159 @@ pre.snip { margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 12px; 
   .crow .check { grid-column: 1 / -1; order: 5; }
   .row { grid-template-columns: 1fr; }
 }
+
+/* ===== v1.6: one list of app panels ===== */
+:root { --soft: color-mix(in srgb, var(--muted) 18%, transparent); --teal: #0f8f80; --teal-bg: color-mix(in srgb, #14b8a6 14%, transparent);
+  --yellow: #a16207; --yellow-bg: color-mix(in srgb, #eab308 18%, transparent); --orange: #c2410c; --orange-bg: color-mix(in srgb, #f97316 16%, transparent);
+  --blue: #1d6fd1; --blue-bg: color-mix(in srgb, #3b82f6 15%, transparent); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --teal: #5eead4; --yellow: #facc15; --orange: #fb923c; --blue: #7cb6ff; }
+}
+.wrap { max-width: 1180px; }
+.iconbtn { display: inline-flex; align-items: center; gap: 8px; }
+.iconbtn svg { width: 16px; height: 16px; flex: none; }
+.iconbtn.close { padding: 8px; }
+#appFilter span { font-size: 12px; color: var(--muted); font-weight: 600; margin-left: 2px; }
+#appFilter span:empty { display: none; }
+.apps { display: grid; gap: 16px; }
+.app { background: var(--glass); border: 1px solid var(--glass-line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden;
+  -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%); }
+.app.um { background: color-mix(in srgb, var(--glass) 60%, transparent); box-shadow: none; }
+.app-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 18px 22px 14px; }
+.app-title { flex: 1 1 300px; min-width: 0; display: grid; gap: 4px; }
+.app-name { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.app-name .nm { font-size: 19px; font-weight: 700; color: var(--fg); text-decoration: none; display: inline-flex; align-items: center; gap: 7px; letter-spacing: -0.01em; }
+.app-name a.nm:hover { color: var(--accent); }
+.app-name .nm svg { width: 14px; height: 14px; opacity: .5; }
+.app.um .app-name .nm { color: color-mix(in srgb, var(--fg) 80%, var(--muted)); }
+.app-sub { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.app-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.app-actions button { padding: 8px 15px; }
+.app-actions .set { color: var(--accent); font-weight: 600; border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.app-actions .manage { border-style: dashed; }
+.expander { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; flex: none; }
+.expander svg { width: 16px; height: 16px; transition: transform .15s ease; }
+.expander[aria-expanded="true"] svg { transform: rotate(90deg); }
+.app-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--soft); }
+.app-col { padding: 14px 22px 18px; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.app-col + .app-col { border-left: 1px solid var(--soft); }
+.col-h { font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.chip { display: inline-flex; align-self: flex-start; align-items: center; gap: 7px; padding: 5px 10px; border-radius: 9px; font-size: 13px; font-weight: 600;
+  border: 1px solid var(--soft); background: color-mix(in srgb, var(--muted) 8%, transparent); max-width: 100%; }
+.chip svg { width: 14px; height: 14px; flex: none; }
+.chip.upd { background: var(--warn-bg); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.chip.auto { background: var(--teal-bg); color: var(--teal); border-color: color-mix(in srgb, var(--teal) 30%, transparent); }
+.chip.off { background: transparent; color: var(--muted); font-weight: 500; }
+.chip.bad { background: var(--bad-bg); color: var(--bad); border-color: color-mix(in srgb, var(--bad) 30%, transparent); }
+.chip.busy svg { animation: blink 1s ease-in-out infinite; }
+.use-row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
+.use-row b { color: var(--fg); font-variant-numeric: tabular-nums; font-weight: 650; }
+.use-row.off b { color: var(--muted); font-weight: 500; }
+.ubar { height: 5px; border-radius: 99px; background: var(--soft); overflow: hidden; margin-top: -4px; }
+.ubar i { display: block; height: 100%; border-radius: 99px; background: var(--accent); transition: width .6s ease; }
+.ubar.mem i { background: #14b8a6; }
+.opened { display: flex; align-items: center; gap: 8px; font-weight: 650; overflow-wrap: anywhere; }
+.opened svg { width: 16px; height: 16px; flex: none; }
+.opened-sub { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.app .warn, .app .err { margin: 0 22px 14px; }
+.comps { border-top: 1px solid var(--soft); background: color-mix(in srgb, var(--muted) 6%, transparent); }
+.comps .col-h { padding: 12px 22px 4px 70px; }
+.comp-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding: 10px 22px 10px 70px; border-top: 1px solid var(--soft); font-size: 14px; }
+.comp-row .cn { flex: 1 1 280px; min-width: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.comp-row .cn b { font-weight: 650; }
+.comp-row .use { color: var(--muted); font-size: 13px; }
+.comp-row .use b { color: var(--fg); }
+.pill.c-green { background: var(--ok-bg); color: var(--ok); }
+.pill.c-yellow { background: var(--yellow-bg); color: var(--yellow); }
+.pill.c-orange { background: var(--orange-bg); color: var(--orange); }
+.pill.c-gray { background: var(--off-bg); color: var(--off); }
+.pill.c-teal { background: var(--teal-bg); color: var(--teal); }
+.pill.c-blue { background: var(--blue-bg); color: var(--blue); }
+.pill.c-blue::before { animation: blink 1s ease-in-out infinite; }
+.pill.c-red { background: var(--bad-bg); color: var(--bad); }
+@media (max-width: 960px) {
+  .app-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app-col:nth-child(3) { border-left: 0; }
+  .app-col:nth-child(n+3) { border-top: 1px solid var(--soft); }
+}
+@media (max-width: 560px) {
+  .app-cols { grid-template-columns: 1fr; }
+  .app-col + .app-col { border-left: 0; border-top: 1px solid var(--soft); }
+  .app-head, .app-col { padding-left: 16px; padding-right: 16px; }
+  .comp-row, .comps .col-h { padding-left: 16px; }
+  .app .warn, .app .err { margin: 0 16px 14px; }
+  #filter { max-width: none; flex: 1 1 100%; }
+}
+
+/* tabbed windows (app settings, System Settings) */
+dialog.big { width: min(1000px, calc(100vw - 24px)); }
+dialog.big form { padding: 0; gap: 0; display: flex; flex-direction: column; height: min(800px, calc(100vh - 48px)); height: min(800px, calc(100dvh - 48px)); }
+.dlg-head { display: flex; align-items: center; gap: 12px; padding: 16px 22px; border-bottom: 1px solid var(--soft); flex-wrap: wrap; }
+.dlg-head h2 { font-size: 20px; font-weight: 750; }
+.dlg-sub { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.dlg-body { display: flex; min-height: 0; flex: 1; }
+.vtabs { flex: 0 0 240px; padding: 14px 10px; border-right: 1px solid var(--soft); display: flex; flex-direction: column; gap: 3px; overflow: auto;
+  background: color-mix(in srgb, var(--muted) 6%, transparent); }
+.vtabs > button { border: 0; background: transparent; box-shadow: none; text-align: left; display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-radius: 10px; font-weight: 600; color: var(--fg); white-space: nowrap; }
+.vtabs > button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.vtabs > button[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.vtabs .note { margin-left: auto; font-size: 12px; color: var(--muted); font-weight: 600; }
+.vtabs .note.hot { color: var(--warn); }
+.navbox { margin-top: 12px; padding: 12px; border: 1px dashed color-mix(in srgb, var(--muted) 45%, transparent); border-radius: 12px;
+  display: grid; gap: 10px; font-size: 13px; color: var(--muted); }
+.panes { flex: 1; min-width: 0; overflow: auto; padding: 20px 24px 24px; display: grid; gap: 16px; align-content: start; }
+.pane { display: grid; gap: 14px; align-content: start; }
+.pane-h { display: grid; gap: 4px; }
+.pane-h h3 { margin: 0; font-size: 18px; }
+.pane-h .hint { margin: 0; }
+.panes > .section { border-top: 0; padding-top: 0; }
+.panes > .section + .section { border-top: 1px solid var(--soft); padding-top: 16px; }
+.box { border: 1px solid var(--soft); border-radius: 14px; padding: 16px; display: grid; gap: 12px; background: color-mix(in srgb, var(--muted) 5%, transparent); }
+.box h4 { margin: 0; font-size: 14px; }
+.dlg-foot { display: flex; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--soft); flex-wrap: wrap; align-items: center; }
+.dlg-foot .formerr { flex-basis: 100%; }
+fieldset.radios { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; }
+fieldset.radios legend { font-size: 13px; font-weight: 600; margin-bottom: 8px; padding: 0; }
+.radio-card { display: flex; gap: 12px; padding: 12px 14px; border: 1px solid var(--soft); border-radius: 12px; cursor: pointer; font-weight: 400; align-items: flex-start; }
+.radio-card input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
+.radio-card span { display: grid; gap: 2px; }
+.radio-card small { color: var(--muted); font-size: 13px; }
+.radio-card:has(input:checked) { border-color: color-mix(in srgb, var(--accent) 70%, transparent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+label.short { max-width: 300px; }
+.checkline small { color: var(--muted); font-weight: 400; }
+.row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.dlist { border: 1px solid var(--soft); border-radius: 14px; overflow: hidden; }
+.drow { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-top: 1px solid var(--soft); flex-wrap: wrap; }
+.dlist > .drow:first-child { border-top: 0; }
+.dtile { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; color: #fff; font-weight: 800; flex: none; font-size: 15px; }
+.dinfo { flex: 1 1 220px; min-width: 0; display: grid; gap: 2px; }
+.dinfo b { font-size: 15px; }
+.dstate { font-size: 13px; color: var(--muted); }
+.dstate.on { color: var(--ok); }
+.dbtns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.dbtns select { width: auto; }
+.updbanner { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 12px; font-size: 14px;
+  background: var(--warn-bg); color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent); }
+.updbanner span { flex: 1 1 260px; }
+.updbanner > svg { width: 18px; height: 18px; flex: none; }
+.updbanner.ok { background: var(--ok-bg); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 30%, transparent); }
+.addr { display: grid; gap: 4px; margin-top: 4px; }
+.addr + .addr { margin-top: 10px; }
+.addr .line { display: flex; gap: 8px; }
+.addr input { font: 12.5px ui-monospace, Menlo, Consolas, monospace; }
+.ents .drow { padding: 10px 14px; }
+.ents .dinfo small { color: var(--muted); }
+@media (max-width: 720px) {
+  .dlg-body { flex-direction: column; }
+  .vtabs { flex: none; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--soft); padding: 8px; }
+  .vtabs .note { display: none; }
+  .navbox { margin: 0; flex: none; min-width: 220px; }
+  .panes { padding: 16px; }
+  .row3 { grid-template-columns: 1fr 1fr; }
+  .dlg-foot #release { order: 5; flex-basis: 100%; }
+  .dlg-foot { padding: 12px 16px; }
+}
 </style>
 </head>
 <body>
@@ -354,17 +507,10 @@ pre.snip { margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 12px; 
     <span class="demo" id="demo" hidden>demo mode</span>
     <span class="spacer"></span>
     <span class="who" id="who" hidden></span>
-    <button id="intBtn">Integrations</button>
-    <button id="settingsBtn">Settings</button>
+    <button id="settingsBtn" class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>System Settings</button>
     <button id="signOut" hidden>Sign out</button>
   </header>
 
-  <nav class="tabs" role="tablist" aria-label="Sections">
-    <button type="button" role="tab" data-tab="apps" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Sleep &amp; wake</button>
-    <button type="button" role="tab" data-tab="maint" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>Maintenance <span class="count" id="mCount" hidden></span></button>
-  </nav>
-
-  <div id="tab-apps">
   <section id="savings" hidden>
     <div class="sechead">
       <h2>Resources saved</h2>
@@ -401,141 +547,224 @@ pre.snip { margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 12px; 
     <p class="hint savings-note" id="sv-note"></p>
   </section>
 
-  <div class="sechead"><h2>Controlled by Stowaway</h2></div>
-  <div class="list" id="list"></div>
-
   <div class="sechead">
-    <h2>Containers on this server</h2>
+    <h2>Apps on this server</h2>
     <span class="spacer"></span>
-    <input type="search" id="filter" placeholder="Filter containers">
-  </div>
-  <div class="table" id="containers"></div>
-  </div>
-
-  <div id="tab-maint" hidden>
-    <p class="mintro">Restart containers on a schedule, and optionally update them to the newest version at the same time. This works for <b>any container</b>, including ones Stowaway doesn't put to sleep. If a container is busy at its scheduled time, Stowaway waits for it to calm down. If a new version won't start, the previous one is put back.</p>
-    <div class="sechead">
-      <h2>Scheduled restarts</h2>
-      <span class="spacer"></span>
-      <span class="hint" id="mTz" style="margin:0"></span>
-      <input type="search" id="mFilter" placeholder="Filter containers">
+    <div class="seg" role="tablist" aria-label="Show" id="appFilter">
+      <button type="button" role="tab" data-f="all" aria-selected="true">All <span></span></button>
+      <button type="button" role="tab" data-f="managed" aria-selected="false">Managed <span></span></button>
+      <button type="button" role="tab" data-f="unmanaged" aria-selected="false">Not managed <span></span></button>
+      <button type="button" role="tab" data-f="updates" aria-selected="false">Updates <span></span></button>
     </div>
-    <div class="table" id="mList"></div>
+    <input type="search" id="filter" placeholder="Filter apps" aria-label="Filter apps">
   </div>
+  <div class="apps" id="apps"></div>
 </div>
 
-<dialog id="mDlg">
-  <form id="mForm" method="dialog">
-    <h2 id="mTitle"></h2>
-    <label>Restart
-      <select name="freq">
-        <option value="off">Never (off)</option>
-        <option value="daily">Every day</option>
-        <option value="weekly">Every week</option>
-        <option value="monthly">Every month</option>
-      </select></label>
-    <div class="row" id="mWhen">
-      <label id="mWeekday">Day
-        <select name="weekday">
-          <option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option>
-          <option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option>
-          <option value="6">Sunday</option>
-        </select></label>
-      <label id="mMday">Day of the month
-        <select name="mday"></select></label>
-      <label>Time
-        <input name="time" type="time" required value="04:00"></label>
+<dialog id="dlg" class="big">
+  <form id="form" method="dialog" novalidate>
+    <div class="dlg-head">
+      <h2 id="dlgTitle"></h2>
+      <span class="pill" id="dlgPill" hidden></span>
+      <span class="dlg-sub" id="dlgSub"></span>
+      <span class="spacer"></span>
+      <button type="button" class="iconbtn close" id="dlgClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
-    <div class="section" id="mOpts">
-      <label class="checkline"><input type="checkbox" name="update"> Also update to the newest version</label>
-      <p class="hint" id="mUpdHint" style="margin:0"></p>
-      <label>If it's busy, wait up to <small>hours; 0 = restart anyway</small>
-        <input name="busy_wait" type="number" min="0" max="24" step="0.5" value="6"></label>
-      <p class="hint" id="mBusyHint" style="margin:0"></p>
-    </div>
-    <p class="hint" id="mNext" style="margin:0"></p>
-    <div class="formerr" id="mErr"></div>
-    <div class="formbar"><span class="spacer"></span>
-      <button type="button" id="mCancel">Cancel</button>
-      <button type="submit" class="primary">Save</button></div>
-  </form>
-</dialog>
+    <div class="dlg-body">
+      <nav class="vtabs" id="appTabs" aria-label="Settings sections">
+        <button type="button" data-t="sleep">Sleep <span class="note" id="nt-sleep"></span></button>
+        <button type="button" data-t="awake">Staying awake <span class="note" id="nt-awake"></span></button>
+        <button type="button" data-t="addr">Address &amp; opening <span class="note" id="nt-addr"></span></button>
+        <button type="button" data-t="comp">Companions <span class="note" id="nt-comp"></span></button>
+        <button type="button" data-t="upd">Updates &amp; restarts <span class="note" id="nt-upd"></span></button>
+        <button type="button" data-t="dash">Dashboards <span class="note" id="nt-dash"></span></button>
+        <button type="button" data-t="ha">Home Assistant <span class="note" id="nt-ha"></span></button>
+        <div class="navbox" id="manageBox" hidden>
+          <span id="manageText"></span>
+          <button type="button" class="primary" id="manageBtn">Let Stowaway manage</button>
+        </div>
+      </nav>
+      <div class="panes">
 
-<dialog id="dlg">
-  <form id="form" method="dialog">
-    <h2 id="dlgTitle"></h2>
-    <label>Put it to sleep
-      <select name="mode">
-        <option value="auto">Automatically, when nobody has used it for a while</option>
-        <option value="manual">Only when I say so (Home Assistant, the API or by hand)</option>
-      </select></label>
-    <p class="hint" id="modeHint" style="margin:0"></p>
-    <label id="idleWrap">After being idle for <small>minutes</small>
-      <input name="idle" type="number" min="1" step="1" value="10"></label>
-    <label>Link port <small id="linkOpt"></small>
-      <input name="link_port" type="number" min="1" max="65535"></label>
-    <p class="hint" id="linkHint"></p>
-    <label>App port <small>inside the container</small>
-      <input name="port" type="number" min="1" max="65535" list="portList" required></label>
-    <datalist id="portList"></datalist>
-    <p class="hint" id="portHint"></p>
-    <div class="section" id="busySection">
-      <h3>Stay awake while busy</h3>
-      <label class="checkline"><input type="checkbox" name="busy_check"> Don't put it to sleep while it's busy</label>
-      <div class="row" id="busyRow">
-        <label>CPU above <small>percent, 100 = one core</small>
-          <input name="busy_cpu" type="number" min="0" step="0.5"></label>
-        <label>Network above <small>KB per second</small>
-          <input name="busy_net" type="number" min="0" step="1"></label>
+        <div class="pane" data-p="sleep">
+          <div class="pane-h"><h3>Sleep</h3><p class="hint" id="sleepIntro"></p></div>
+          <fieldset class="radios">
+            <legend>Put it to sleep</legend>
+            <label class="radio-card"><input type="radio" name="mode" value="auto"><span><b>Automatically</b><small>When nobody has used it for a while.</small></span></label>
+            <label class="radio-card"><input type="radio" name="mode" value="manual"><span><b>Only when told</b><small>Home Assistant, the API or the Sleep now button decide.</small></span></label>
+          </fieldset>
+          <p class="hint" id="modeHint" style="margin:0"></p>
+          <label id="idleWrap" class="short">After being idle for <small>minutes</small>
+            <input name="idle" type="number" min="1" step="1" value="10"></label>
+          <div class="box" id="blockBox">
+            <label class="checkline"><input type="checkbox" name="block"> Don't wake it when its link is opened <small>(switch it off)</small></label>
+            <p class="hint" style="margin:0">Visitors see a "switched off" page instead of waking it. The Wake button here, Home Assistant and keeping it awake still work and switch it back on.</p>
+          </div>
+          <div class="box" id="holdBox">
+            <h4>Keep awake</h4>
+            <p class="hint" id="holdState" style="margin:0"></p>
+            <div class="inline" id="holdBtns">
+              <button type="button" data-hold="60">1 hour</button>
+              <button type="button" data-hold="240">4 hours</button>
+              <button type="button" data-hold="720">12 hours</button>
+              <button type="button" data-hold="forever">Until I release it</button>
+              <button type="button" data-hold="release" id="holdRelease">Release</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pane" data-p="awake">
+          <div class="pane-h"><h3>Staying awake</h3><p class="hint">Times when it shouldn't be put to sleep, even if nobody is using it.</p></div>
+          <div class="box" id="busySection">
+            <label class="checkline"><input type="checkbox" name="busy_check"> Awake while busy</label>
+            <div class="row" id="busyRow">
+              <label>CPU above <small>percent, 100 = one core</small>
+                <input name="busy_cpu" type="number" min="0" step="0.5"></label>
+              <label>Network above <small>KB per second</small>
+                <input name="busy_net" type="number" min="0" step="1"></label>
+            </div>
+            <p class="hint" id="busyHint" style="margin:0"></p>
+          </div>
+          <p class="hint" id="busyOff" style="margin:0" hidden>Busy checks only matter when it sleeps automatically (Sleep tab).</p>
+          <div class="box">
+            <h4>Awake hours</h4>
+            <p class="hint" id="hoursHint" style="margin:0"></p>
+            <div id="hours"></div>
+            <div><button type="button" id="addHours">Add awake hours</button></div>
+          </div>
+        </div>
+
+        <div class="pane" data-p="addr">
+          <div class="pane-h"><h3>Address &amp; opening</h3><p class="hint" id="linkHint"></p></div>
+          <div class="row">
+            <label>Link port <small id="linkOpt"></small>
+              <input name="link_port" type="number" min="1" max="65535"></label>
+            <label>App port <small>inside the container</small>
+              <input name="port" type="number" min="1" max="65535" list="portList" required></label>
+          </div>
+          <datalist id="portList"></datalist>
+          <p class="hint" id="portHint" style="margin:0"></p>
+          <label>When opened
+            <select name="open_mode">
+              <option value="proxy">Stay on Stowaway's address (recommended)</option>
+              <option value="direct">Go to the app's own address</option>
+            </select></label>
+          <p class="hint" id="openHint" style="margin:0"></p>
+          <div class="row">
+            <label>Start page <small>overrides System Settings</small>
+              <select name="style">
+                <option value="">Use the default from System Settings</option>
+                <option value="please_wait">Please Wait</option>
+                <option value="starting_service">Starting Service</option>
+                <option value="loading_name">Loading %name%</option>
+                <option value="countdown">Ready in 3, 2, 1</option>
+                <option value="custom">Custom message</option>
+              </select></label>
+            <label>Ready delay <small>seconds; empty = default</small>
+              <input name="delay" type="number" min="0" max="300" step="0.5" placeholder="default"></label>
+          </div>
+          <details>
+            <summary>Advanced: hostnames and upstream URL</summary>
+            <label>Hostnames <small>optional, comma separated, if you use local DNS</small>
+              <input name="hosts" placeholder="jellyfin.home.lan"></label>
+            <label>Upstream URL <small>only if the app can't be found automatically</small>
+              <input name="upstream" placeholder="http://192.168.1.2:8096"></label>
+          </details>
+        </div>
+
+        <div class="pane" data-p="comp">
+          <div class="pane-h"><h3>Companions</h3><p class="hint" id="compHint"></p></div>
+          <div id="compList" class="complist"></div>
+        </div>
+
+        <div class="pane" data-p="upd">
+          <div class="pane-h"><h3>Updates &amp; restarts</h3><p class="hint">If a new version won't start, the previous one is put back. Settings, volumes and networks are kept.</p></div>
+          <div id="updBanner"></div>
+          <div class="box">
+            <h4>Scheduled restart</h4>
+            <div class="row3">
+              <label>Restart
+                <select name="freq">
+                  <option value="off">Never</option>
+                  <option value="daily">Every day</option>
+                  <option value="weekly">Every week</option>
+                  <option value="monthly">Every month</option>
+                </select></label>
+              <label id="mWeekday">Day
+                <select name="weekday">
+                  <option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option>
+                  <option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option>
+                  <option value="6">Sunday</option>
+                </select></label>
+              <label id="mMday">Day of the month
+                <select name="mday"></select></label>
+              <label id="mTime">Time
+                <input name="time" type="time" value="04:00"></label>
+            </div>
+            <div class="sub" id="mOpts">
+              <label class="checkline"><input type="checkbox" name="sch_update"> Auto-update: install the newest version when it restarts</label>
+              <p class="hint" id="mUpdHint" style="margin:0"></p>
+              <label class="short">If it's busy, wait up to <small>hours; 0 = restart anyway</small>
+                <input name="busy_wait" type="number" min="0" max="24" step="0.5" value="6"></label>
+              <p class="hint" id="mBusyHint" style="margin:0"></p>
+            </div>
+            <p class="hint" id="mNext" style="margin:0"></p>
+            <div class="inline"><button type="button" id="mRun">Restart now</button></div>
+          </div>
+          <div class="box" id="wakeUpdBox">
+            <label class="checkline"><input type="checkbox" name="upd_on"> Auto-update when it wakes</label>
+            <label id="updEveryWrap" class="short">At most every <small>hours; 0 = every time it wakes</small>
+              <input name="upd_every" type="number" min="0" max="720" step="1"></label>
+            <p class="hint" id="updHint" style="margin:0"></p>
+          </div>
+          <div class="box">
+            <h4>Update checks</h4>
+            <label class="short">Check for a newer version every <small>hours; 0 = never</small>
+              <input name="chk_every" type="number" min="0" max="720" step="1"></label>
+            <p class="hint" id="chkHint" style="margin:0"></p>
+            <div class="inline" id="updBtns"><button type="button" id="updCheck">Check now</button></div>
+          </div>
+        </div>
+
+        <div class="pane" data-p="dash">
+          <div class="pane-h"><h3>Dashboards</h3><p class="hint" id="dashIntro"></p></div>
+          <div id="dashMv"></div>
+          <div class="dlist" id="dashList"></div>
+          <div id="dashMsg" class="hint" style="margin:0"></div>
+          <div class="box">
+            <h4>Status addresses</h4>
+            <p class="hint" style="margin:0">For any other dashboard. Checking them never wakes the app.</p>
+            <div id="statusAddrs"></div>
+          </div>
+          <details id="dashManual">
+            <summary>Set it up by hand</summary>
+            <nav class="tabs small" role="tablist" id="intTabs">
+              <button type="button" data-t="homarr" aria-selected="true">Homarr</button>
+              <button type="button" data-t="homepage" aria-selected="false">Homepage</button>
+              <button type="button" data-t="dashy" aria-selected="false">Dashy</button>
+              <button type="button" data-t="glance" aria-selected="false">Glance</button>
+              <button type="button" data-t="heimdall" aria-selected="false">Heimdall</button>
+              <button type="button" data-t="urls" aria-selected="false">API</button>
+            </nav>
+            <div id="intBody" style="display:grid;gap:12px;margin-top:12px"></div>
+          </details>
+        </div>
+
+        <div class="pane" data-p="ha">
+          <div class="pane-h"><h3>Home Assistant</h3><p class="hint" id="haIntro"></p></div>
+          <div class="dlist" id="haList"></div>
+          <div class="inline"><button type="button" id="haTokens">API tokens (System Settings)</button></div>
+          <details>
+            <summary>Without HACS: REST setup</summary>
+            <div id="haRest" style="display:grid;gap:12px;margin-top:10px"></div>
+          </details>
+        </div>
+
+        <div class="formerr" id="formErr"></div>
       </div>
-      <p class="hint" id="busyHint" style="margin:0"></p>
     </div>
-    <div class="section">
-      <h3>Companion containers</h3>
-      <p class="hint" id="compHint" style="margin:0"></p>
-      <div id="compList" class="complist"></div>
-    </div>
-    <div class="section">
-      <h3>Awake hours</h3>
-      <p class="hint" id="hoursHint" style="margin:0"></p>
-      <div id="hours"></div>
-      <div><button type="button" id="addHours">Add awake hours</button></div>
-    </div>
-    <div class="section">
-      <h3>Updates</h3>
-      <label class="checkline"><input type="checkbox" name="upd_on"> Check for a newer version when waking</label>
-      <label id="updEveryWrap">Check at most every <small>hours; 0 = every time it wakes</small>
-        <input name="upd_every" type="number" min="0" max="720" step="1"></label>
-      <p class="hint" id="updHint" style="margin:0"></p>
-      <div class="inline" id="updBtns"><button type="button" id="updCheck">Check now</button></div>
-    </div>
-    <details>
-      <summary>Advanced</summary>
-      <label>When opened
-        <select name="open_mode">
-          <option value="proxy">Stay on Stowaway's address (recommended)</option>
-          <option value="direct">Go to the app's own address</option>
-        </select></label>
-      <p class="hint" id="openHint" style="margin:6px 0 0"></p>
-      <label>Hostnames <small>optional, comma separated, if you use local DNS</small>
-        <input name="hosts" placeholder="jellyfin.home.lan"></label>
-      <label>Start page <small>overrides the style in Settings for this app</small>
-        <select name="style">
-          <option value="">Use default from Settings</option>
-          <option value="please_wait">Please Wait</option>
-          <option value="starting_service">Starting Service</option>
-          <option value="loading_name">Loading %name%</option>
-          <option value="countdown">Ready in 3, 2, 1</option>
-          <option value="custom">Custom message</option>
-        </select></label>
-      <label>Ready delay <small>seconds; leave empty to use the default</small>
-        <input name="delay" type="number" min="0" max="300" step="0.5" placeholder="default"></label>
-      <label>Upstream URL <small>only if the app can't be found automatically</small>
-        <input name="upstream" placeholder="http://192.168.1.2:8096"></label>
-    </details>
-    <div class="formerr" id="formErr"></div>
-    <div class="formbar">
-      <button type="button" class="danger" id="release" hidden>Disable Stowaway</button>
+    <div class="dlg-foot">
+      <button type="button" class="danger" id="release" hidden>Stop managing</button>
       <span class="spacer"></span>
       <button type="button" id="cancel">Cancel</button>
       <button type="submit" class="primary" id="saveBtn">Save</button>
@@ -543,10 +772,23 @@ pre.snip { margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 12px; 
   </form>
 </dialog>
 
-<dialog id="setDlg">
+
+<dialog id="setDlg" class="big">
   <form id="setForm" method="dialog">
-    <h2>Settings</h2>
-    <div class="section">
+    <div class="dlg-head"><h2>System Settings</h2><span class="spacer"></span>
+      <button type="button" class="iconbtn close" id="setClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="dlg-body">
+      <nav class="vtabs" id="setTabs" aria-label="System Settings sections">
+        <button type="button" data-t="general">General <span class="note">start page, time</span></button>
+        <button type="button" data-t="dash">Dashboards <span class="note">Homarr</span></button>
+        <button type="button" data-t="ha">Home Assistant <span class="note">tokens</span></button>
+        <button type="button" data-t="net">Network <span class="note">macvlan</span></button>
+        <button type="button" data-t="https">HTTPS &amp; access</button>
+        <button type="button" data-t="diag">Diagnostics</button>
+        <button type="button" data-t="account" id="setAcctTab">Account</button>
+      </nav>
+      <div class="panes">
+    <div class="section" data-p="general">
       <h3>Start page</h3>
       <p class="hint" style="margin:0">What visitors see while a sleeping app starts up. If it fails to start, they see an error page with a Try again button.</p>
       <label>Style
@@ -567,9 +809,9 @@ pre.snip { margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 12px; 
         <button type="button" id="prevError">Preview error page</button>
       </div>
     </div>
-    <div class="section">
+    <div class="section" data-p="general">
       <h3>Busy detection and awake hours</h3>
-      <p class="hint" style="margin:0">An app counts as busy, and isn't put to sleep, while its CPU or network use is above these. Each app can override them in Edit.</p>
+      <p class="hint" style="margin:0">An app counts as busy, and isn't put to sleep, while its CPU or network use is above these. Each app can override them in its Settings → Staying awake.</p>
       <div class="row">
         <label>CPU above <small>percent, 100 = one core</small>
           <input name="bcpu" type="number" min="0" step="0.5"></label>
@@ -581,7 +823,7 @@ pre.snip { margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 12px; 
       <datalist id="tzList"></datalist>
       <p class="hint" id="tzHint" style="margin:0"></p>
     </div>
-    <div class="section">
+    <div class="section" data-p="https">
       <h3>HTTPS</h3>
       <label class="checkline"><input type="checkbox" name="https_on"> Serve apps over HTTPS</label>
       <div class="sub" id="httpsFields">
@@ -615,7 +857,7 @@ pre.snip { margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 12px; 
       <label class="checkline"><input type="checkbox" name="lan_only"> Only allow this dashboard from my home network</label>
       <p class="hint" id="lanHint" style="margin:0"></p>
     </div>
-    <div class="section">
+    <div class="section" data-p="dash">
       <h3>Dashboard status checks</h3>
       <p class="hint" style="margin:0">Requests matching these are treated as status checks from Heimdall, Homarr and similar: they never wake a sleeping container and never reset its idle timer.</p>
       <label>Ignore user agents <small>one per line; matches if the text appears anywhere</small>
@@ -624,22 +866,23 @@ pre.snip { margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 12px; 
         <textarea name="ips" placeholder="192.168.1.60"></textarea></label>
       <p class="hint" style="margin:0">A tile's status URL can also be <code id="statusEx"></code>, which always answers without waking anything.</p>
         </div>
-    <div class="section">
+    <div class="section" data-p="dash">
       <h3>Homarr</h3>
-      <p class="hint" style="margin:0">Lets you add apps to Homarr from <b>Integrations → Homarr</b>, with their status dot already set up. Create an API key in Homarr under <b>Manage → Tools → API</b> while signed in as an admin.</p>
+      <p class="hint" style="margin:0">Lets you add apps to Homarr from each app's <b>Settings → Dashboards</b>, with their status dot already set up. Create an API key in Homarr under <b>Manage → Tools → API</b> while signed in as an admin.</p>
       <label>Homarr address <small>as this server reaches it, e.g. http://192.168.1.6:7575</small>
         <input name="homarr_url" placeholder="http://192.168.1.6:7575" inputmode="url" autocomplete="off" spellcheck="false"></label>
       <label>Homarr API key <small>looks like 1a2b3c4d.Xy…; kept on this server, never shown again</small>
         <input name="homarr_key" type="password" autocomplete="off" spellcheck="false"></label>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" id="homarrTest">Test connection</button><span class="hint" id="homarrMsg" style="margin:0"></span></div>
+      <p class="hint" style="margin:0">Then add each app from its <b>Settings → Dashboards</b>. For the status in words (In Use, Sleeping in 8 min…), <a class="btn" id="homarrWidget" href="#" download="stowaway-status-widget.json">download the status widget</a> once and import it in Homarr under <b>Manage → Custom widgets → Import</b>.</p>
     </div>
-    <div class="section">
+    <div class="section" data-p="net">
       <h3>Macvlan</h3>
       <label>Macvlan helper IP <small>only needed if you control containers on macvlan networks</small>
         <input name="shim" placeholder="192.168.1.250" inputmode="decimal"></label>
       <p class="hint" id="mvHint" style="margin:6px 0 0"></p>
     </div>
-    <div class="section" id="diagSection">
+    <div class="section" id="diagSection" data-p="diag">
       <h3>Diagnostics</h3>
       <p class="hint" style="margin:0">If something isn't working, a diagnostic report helps find out why. It's only shown or downloaded here: nothing is sent anywhere unless you attach it to a problem report yourself. Passwords, tokens and API keys are always removed.</p>
       <label class="checkline"><input type="checkbox" name="diag_debug"> Detailed logging</label>
@@ -653,7 +896,7 @@ pre.snip { margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 12px; 
       </div>
       <p class="hint" id="diagVersion" style="margin:0"></p>
     </div>
-    <div class="section" id="accountSection">
+    <div class="section" id="accountSection" data-p="account">
       <h3>Account</h3>
       <p class="hint" style="margin:0">Change the username or password you sign in with. Changing the password signs out your other devices.</p>
       <label>Username
@@ -674,51 +917,27 @@ pre.snip { margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 12px; 
       <div class="formerr" id="acctMsg"></div>
       <div class="inline"><button type="button" id="acctBtn">Update account</button></div>
     </div>
-<div class="formerr" id="setErr"></div>
-    <div class="formbar"><span class="spacer"></span>
+<div class="section" id="tokSection" data-p="ha">
+      <h3>Home Assistant</h3>
+      <p class="hint" style="margin:0">Install the <b>Stowaway</b> integration from HACS, then enter this dashboard's address (<code id="haAddr"></code>) and a token from here. Every app gets switches, sensors and buttons.</p>
+      <h3>API tokens</h3>
+      <p class="hint" style="margin:0">Home Assistant and scripts use a token instead of your password. A token can see and control apps (wake, sleep, keep awake, switch off, restart) but can't change settings or your account. It only works from your home network unless you allow the dashboard from outside.</p>
+      <div id="tokList"></div>
+      <div id="tokNew"></div>
+      <div class="inline"><input id="tokName" placeholder="Name, e.g. Home Assistant" maxlength="60" style="flex:1;min-width:180px">
+        <button type="button" id="tokCreate">Create token</button></div>
+    </div>
+    <div class="formerr" id="setErr"></div>
+      </div>
+    </div>
+    <div class="dlg-foot"><span class="spacer"></span>
       <button type="button" id="setCancel">Cancel</button>
       <button type="submit" class="primary">Save</button></div>
   </form>
 </dialog>
 
 
-<dialog id="intDlg">
-  <form id="intForm" method="dialog">
-    <h2>Dashboards &amp; Home Assistant</h2>
-    <p class="hint" style="margin:0">Show whether apps are awake, and when they restart next, on your dashboard tiles. Or control them from Home Assistant. Status addresses never wake an app.</p>
-    <label>App
-      <select name="app" id="intApp"></select></label>
-    <nav class="tabs small" role="tablist" id="intTabs">
-      <button type="button" data-t="homarr" aria-selected="true">Homarr</button>
-      <button type="button" data-t="homepage" aria-selected="false">Homepage</button>
-      <button type="button" data-t="dashy" aria-selected="false">Dashy</button>
-      <button type="button" data-t="glance" aria-selected="false">Glance</button>
-      <button type="button" data-t="heimdall" aria-selected="false">Heimdall</button>
-      <button type="button" data-t="ha" aria-selected="false">Home Assistant</button>
-      <button type="button" data-t="urls" aria-selected="false">Addresses</button>
-    </nav>
-    <div id="intBody" style="display:grid;gap:12px"></div>
-    <div class="section" id="tokSection" hidden>
-      <h3>API tokens</h3>
-      <p class="hint" style="margin:0">Home Assistant and scripts use a token instead of your password. A token can see and control apps (wake, sleep, keep awake, switch off, restart) but can't change settings or your account. It only works from your home network unless you allow the dashboard from outside.</p>
-      <div id="tokList"></div>
-      <div id="tokNew"></div>
-      <div class="inline"><input name="tokname" placeholder="Name, e.g. Home Assistant" maxlength="60" style="flex:1;min-width:180px">
-        <button type="button" id="tokCreate">Create token</button></div>
-    </div>
-    <div class="formerr" id="intErr"></div>
-    <div class="formbar"><span class="spacer"></span><button type="button" id="intClose">Close</button></div>
-  </form>
-</dialog>
-<div class="menu" id="menu" hidden>
-  <div class="mh">Keep awake for</div>
-  <button data-hold="60">1 hour</button>
-  <button data-hold="240">4 hours</button>
-  <button data-hold="720">12 hours</button>
-  <button data-hold="forever">Until I release it</button>
-  <div class="mh" style="border-top:1px solid var(--line);margin-top:4px;padding-top:8px">Or</div>
-  <button data-hold="off">Sleep, and don't wake until I allow it</button>
-</div>
+
 
 <script>
 const API = location.pathname.replace(/\/$/, '') + '/api';
@@ -798,105 +1017,284 @@ function linksFor(s) {
 }
 const LOCK = '<svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 
-/* ---------- controlled cards ---------- */
-function renderServices() {
-  const now = Date.now() / 1000 + offset;
-  const running = services.filter(s => s.status === 'running').length;
-  $('sum').textContent = services.length ? `${running} of ${services.length} awake` : '';
-  if (!services.length) {
-    $('list').innerHTML = '<div class="empty">Nothing yet. Tick <b>Enable Stowaway</b> on a container below.</div>';
-    return;
+/* ---------- the app list ---------- */
+const SVG = (d, extra = '') => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${d}</svg>`;
+const IC = {
+  timer: SVG('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+  moon: SVG('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
+  busy: SVG('<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'),
+  sun: SVG('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+  lock: SVG('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'),
+  off: SVG('<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>'),
+  down: SVG('<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>'),
+  auto: SVG('<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>'),
+  check: SVG('<path d="M20 6 9 17l-5-5"/>'),
+  alert: SVG('<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>'),
+  monitor: SVG('<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>'),
+  phone: SVG('<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>'),
+  home: SVG('<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>'),
+  api: SVG('<path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"/>'),
+  hand: SVG('<path d="M9 11V5a2 2 0 0 1 4 0v6"/><path d="M13 9a2 2 0 0 1 4 0v4a7 7 0 0 1-7 7 6 6 0 0 1-5-3l-2-4a2 2 0 0 1 3.4-2L8 13V7"/>'),
+  cal: SVG('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
+  ext: SVG('<path d="M15 3h6v6M10 14 21 3M21 14v7H3V3h7"/>'),
+  chev: SVG('<path d="m9 6 6 6-6 6"/>'),
+  sliders: SVG('<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>'),
+  plus: SVG('<path d="M12 5v14M5 12h14"/>'),
+};
+const DAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+let appFilter = 'all', lastAppsHtml = '';
+const openComps = new Set();
+let hostInfo = { ncpu: 4, mem_mb: 16384 };
+
+function fmtMins(sec) {
+  const m = Math.max(1, Math.round(sec / 60));
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60), r = m % 60;
+  return r ? `${h} h ${r} min` : `${h} h`;
+}
+function fmtMB(mb) { return mb == null ? '–' : mb >= 1024 ? `${(mb / 1024).toFixed(mb >= 10240 ? 0 : 1)} GB` : `${Math.round(mb)} MB`; }
+function fmtTime12(t) {
+  const [h, m] = t.split(':').map(Number), ap = h < 12 ? 'am' : 'pm', h12 = h % 12 || 12;
+  return m ? `${h12}:${String(m).padStart(2, '0')} ${ap}` : `${h12} ${ap}`;
+}
+function daysText(days) {
+  const d = [...days].sort((a, b) => a - b);
+  if (d.length === 7) return 'every day';
+  if (d.join() === '0,1,2,3,4') return 'weekdays';
+  if (d.join() === '5,6') return 'weekends';
+  return d.map(i => DAYS_SHORT[i]).join(', ');
+}
+function hoursText(w) { return `Awake ${fmtTime12(w.from)} to ${fmtTime12(w.to)} ${daysText(w.days)}`; }
+function agoText(ts) {
+  const s = Math.max(0, Date.now() / 1000 + offset - ts);
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  if (s < 172800) return 'yesterday';
+  return `${Math.round(s / 86400)} days ago`;
+}
+function uaName(ua) {
+  if (!ua) return 'a browser';
+  const b = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox'
+    : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : null;
+  const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad|iPod/.test(ua) ? 'iPhone/iPad' : /CrOS/.test(ua) ? 'Chromebook'
+    : /Macintosh|Mac OS X/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : null;
+  if (b) return os ? `${b} on ${os}` : b;
+  const m = ua.match(/^([A-Za-z][\w .-]{1,40}?)\//);
+  return m ? m[1] : ua.slice(0, 40);
+}
+function openedInfo(o) {
+  if (!o) return { label: 'Last opened by', who: '', sub: 'Not opened since this was added', icon: '' };
+  const when = agoText(o.at);
+  if (o.kind === 'visit') {
+    const mobile = /Android|iPhone|iPad|Mobile/.test(o.ua || '');
+    const name = o.host || uaName(o.ua);
+    const sub = [o.host ? uaName(o.ua) : null, o.ip, when].filter(Boolean).join(' · ');
+    return { label: 'Last opened by', who: name, sub, icon: mobile ? IC.phone : IC.monitor };
   }
-  $('list').innerHTML = services.map(s => {
-    const st = stateOf(s), idleFor = now - s.idle_since, usedAgo = now - s.last_activity;
-    let idle;
-    if (st === 'updating') {
-      const u = s.update || {}, pct = Math.round(u.pct || 0);
-      const what = u.phase === 'installing' ? 'Installing' : u.phase === 'unpacking' ? 'Unpacking'
-        : u.total_bytes ? `${fmtBytes(u.done_bytes || 0)} of ${fmtBytes(u.total_bytes)}` : 'Downloading';
-      idle = `<div class="label"><span class="state">${ICON.down} Updating</span><b>${pct}%</b></div>` +
-             `<div class="bar busy"><i style="width:${pct}%"></i></div><div class="stats"><span>${esc(what)}</span></div>`;
-    } else if (st === 'maintenance') {
-      idle = `<div class="label"><span class="state">${ICON.restart} Maintenance</span><b>see Maintenance tab</b></div><div class="bar busy full"><i></i></div>`;
-    } else if (st === 'running' && s.forced === 'hold') {
-      idle = `<div class="label"><span class="state">${ICON.hold} Kept awake</span><b>${s.forced_until ? 'until ' + fmtWhen(s.forced_until) : 'until released'}</b></div><div class="bar held full"><i></i></div>`;
-    } else if (st === 'running' && s.forced === 'schedule') {
-      idle = `<div class="label"><span class="state">${ICON.clock} Awake hours</span><b>until ${fmtWhen(s.forced_until)}</b></div><div class="bar held full"><i></i></div>`;
-    } else if (st === 'running' && s.active > 0) {
-      idle = `<div class="label">In use <b>${s.active} request${s.active > 1 ? 's' : ''}</b></div><div class="bar full"><i></i></div>`;
-    } else if (st === 'running' && s.busy) {
-      idle = `<div class="label"><span class="state">${ICON.bolt} Busy</span><b>${esc(busyReason(s))}</b></div><div class="bar busy full"><i></i></div>`;
-    } else if (st === 'running' && s.idle_timeout > 0) {
-      const left = s.idle_timeout - idleFor, pct = Math.max(0, Math.min(100, left / s.idle_timeout * 100));
-      idle = `<div class="label">Sleeps in <b>${fmtDur(left)}</b></div><div class="bar ${pct < 20 ? 'low' : ''}"><i style="width:${pct}%"></i></div>`;
-    } else if (st === 'running') {
-      idle = `<div class="label">Sleeps <b>when told</b></div>`;
-    } else {
-      idle = `<div class="label">Last used <b>${ago(usedAgo)}</b></div>` +
-        (s.next_awake ? `<div class="label"><span class="state" style="font-weight:400;color:var(--muted)">${ICON.clock} Wakes</span><b>${fmtWhen(s.next_awake)}</b></div>`
-                      : `<div class="label">Sleeps after <b>${s.idle_timeout ? fmtDur(s.idle_timeout) : 'when told'}</b></div>`);
-    }
-    if (st === 'running' && s.stats) {
-      idle += `<div class="stats"><span>CPU <b>${s.stats.cpu}%</b></span>${s.stats.net != null ? `<span>Net <b>${fmtRate(s.stats.net)}</b></span>` : ''}</div>`;
-    }
-    const busy = !!s.transition;
-    const btn = st === 'running' || st === 'stopping'
-      ? `<button data-act="stop" data-n="${esc(s.name)}" ${busy ? 'disabled' : ''}>Sleep now</button>`
-      : `<button data-act="start" data-n="${esc(s.name)}" ${busy || st === 'missing' ? 'disabled' : ''}>Wake</button>`;
-    const links = linksFor(s);
-    const linkHtml = links.length
-      ? links.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">${u.startsWith('https:') ? LOCK : ''}${esc(u.replace(/^https?:\/\//, ''))}</a>`).join(', ')
-      : 'no link · woken from Home Assistant or here';
-    const open = links.length ? `<a class="btn" href="${esc(links[0])}" target="_blank" rel="noopener">Open</a>` : '';
-    return `<div class="card">
-      <div>
-        <div class="name">${esc(s.name)} <span class="pill ${st}">${st === 'sleeping' && s.block_wake ? 'switched off' : st}</span></div>
-        <div class="meta">${linkHtml}</div>
-        <div class="meta">app port ${s.port}${s.upstream ? ' · via ' + esc(s.upstream.replace(/^https?:\/\//, '')) : ''}${s.via_macvlan ? '<span class="tag">macvlan</span>' : ''}${(s.companions || []).length ? `<span class="tag" title="Start and sleep together with it: ${esc(s.companions.join(', '))}">+ ${s.companions.length} companion${s.companions.length > 1 ? 's' : ''}</span>` : ''}${updateReady(s) ? '<span class="tag ready" title="Installs the next time it wakes">update ready</span>' : ''}${s.open_mode === 'direct' ? '<span class="tag" title="Browsers are sent to the app\'s own address after waking">opens directly</span>' : ''}${s.maintenance && s.maintenance.next_restart_text ? `<span class="tag" title="${esc(s.maintenance.schedule)}">restart ${esc(s.maintenance.next_restart_text)}</span>` : ''}</div>
-      </div>
-      <div class="idle">${idle}</div>
-      <div class="actions">${open}${btn}${s.forced === 'hold'
-        ? `<button data-act="release" data-n="${esc(s.name)}">Release</button>`
-        : `<button data-act="holdmenu" data-n="${esc(s.name)}">Keep awake</button>`}<button data-act="edit" data-n="${esc(s.name)}">Edit</button></div>
-      ${s.companion_error ? `<div class="warn">${esc(s.companion_error)}</div>` : ''}
-      ${s.block_wake ? `<div class="warn">Switched off: visitors can't wake it (set from Home Assistant, the API or the Keep awake menu).<button data-act="unblock" data-n="${esc(s.name)}">Allow waking</button></div>` : ''}
-      ${s.update_error ? `<div class="warn">${esc(s.update_error)}<button data-act="retryupdate" data-n="${esc(s.name)}">Try again next wake</button></div>` : ''}
-      ${s.warning ? `<div class="warn">${esc(s.warning)}${/Settings/.test(s.warning) ? '<button data-act="settings">Open Settings</button>' : ''}</div>` : ''}
-      ${s.error && s.error !== s.warning ? `<div class="err">${esc(s.error)}</div>` : ''}
-    </div>`;
-  }).join('');
+  if (o.kind === 'ha') return { label: 'Last woken by', who: 'Home Assistant', sub: when, icon: IC.home };
+  if (o.kind === 'api') return { label: 'Last woken by', who: o.detail || 'the API', sub: `API token · ${when}`, icon: IC.api };
+  if (o.kind === 'schedule') return { label: 'Last woken by', who: 'Awake hours', sub: when, icon: IC.cal };
+  return { label: 'Last woken by', who: o.detail === 'Keep awake' ? 'Keep awake' : 'Wake button', sub: `Stowaway · ${when}`, icon: IC.hand };
+}
+function stateLabel(s) {
+  // The same labels dashboards get (v1.5), with the countdown kept live here.
+  let text = s.indicator || stateOf(s), color = s.indicator_color || 'gray';
+  if (color === 'yellow' && s.sleeps_at) {
+    const left = s.sleeps_at - (Date.now() / 1000 + offset);
+    text = left > 0 ? `Sleeping in ${fmtMins(left)}` : 'Ready to Sleep';
+    if (left <= 0) color = 'orange';
+  }
+  if (s.block_wake && stateOf(s) === 'sleeping') { text = 'Switched off'; color = 'gray'; }
+  return `<span class="pill c-${esc(color)}">${esc(text)}</span>`;
+}
+function chip(cls, icon, text, title) {
+  return `<span class="chip ${cls}"${title ? ` title="${esc(title)}"` : ''}>${icon}${esc(text)}</span>`;
+}
+function updateChips(u, managed) {
+  let a;
+  if (!u) u = {};
+  if (u.installing) a = chip('upd busy', IC.down, 'Installing update…');
+  else if (u.available) a = chip('upd', IC.down, 'Update available');
+  else if (u.failed_before) a = chip('bad', IC.alert, 'Update failed last time');
+  else if (u.status === 'current') a = chip('', IC.check, 'Up to date', u.checked_at ? `Checked ${agoText(u.checked_at)}` : '');
+  else if (u.status === 'error') a = chip('off', IC.alert, 'Couldn\'t check', u.detail || '');
+  else if (u.status === 'unsupported') a = chip('off', IC.off, 'Can\'t update', u.detail || '');
+  else if (!u.check_every) a = chip('off', IC.down, 'No update checks');
+  else a = chip('off', IC.down, 'Not checked yet');
+  let b;
+  if (u.auto === 'schedule') b = chip('auto', IC.auto, `Auto-update ${u.next_restart_text || 'on schedule'}`);
+  else if (u.auto === 'wake') b = chip('auto', IC.auto, 'Auto-update when it wakes');
+  else b = chip('off', IC.auto, 'Auto-update off');
+  return a + b;
+}
+function usageHtml(u, state) {
+  if (!u) {
+    const why = state === 'sleeping' ? 'asleep' : state === 'stopped' ? 'stopped' : '–';
+    return `<div class="use-row off"><span>CPU</span><b>${why}</b></div><div class="ubar"><i style="width:0"></i></div>
+      <div class="use-row off"><span>Memory</span><b>${why}</b></div><div class="ubar mem"><i style="width:0"></i></div>`;
+  }
+  const cpuPct = Math.min(100, u.cpu / Math.max(1, hostInfo.ncpu));
+  const memPct = u.mem != null && hostInfo.mem_mb ? Math.min(100, u.mem / hostInfo.mem_mb * 100) : 0;
+  return `<div class="use-row"><span>CPU</span><b>${u.cpu}%</b></div><div class="ubar" title="${cpuPct.toFixed(1)}% of the whole CPU"><i style="width:${Math.max(cpuPct, u.cpu > 0 ? 1.5 : 0)}%"></i></div>
+    <div class="use-row"><span>Memory</span><b>${fmtMB(u.mem)}</b></div><div class="ubar mem" title="${memPct.toFixed(1)}% of RAM"><i style="width:${Math.max(memPct, u.mem ? 1.5 : 0)}%"></i></div>`;
+}
+function unmanagedLink(c) {
+  if (c.network_mode === 'host') return null;
+  if (c.macvlan_ip) return c.exposed.length ? `http://${c.macvlan_ip}:${c.exposed[0]}` : null;
+  if (c.published.length) return `http://${host}:${c.published[0][1]}`;
+  return null;
 }
 
-/* ---------- all containers ---------- */
-function portsText(c) {
-  if (c.network_mode === 'host') return 'host network';
-  if (c.macvlan_ip) return `macvlan ${c.macvlan_ip}` + (c.exposed.length ? ` · ${c.exposed.join(', ')}` : '');
-  if (c.published.length) return c.published.map(([cp, hp]) => cp === hp ? `${hp}` : `${hp}→${cp}`).join(', ');
-  if (c.exposed.length) return c.exposed.join(', ') + ' (not published)';
-  return 'no ports';
+function appRows() {
+  const byName = Object.fromEntries(containers.map(c => [c.name, c]));
+  const managed = services.map(s => ({ kind: 'svc', s, c: byName[s.container] }));
+  const others = containers.filter(c => !c.controlled_by && !c.companion_of).map(c => ({ kind: 'ctr', c }));
+  return managed.concat(others);
 }
-function renderContainers() {
+function hasUpdate(r) { return !!((r.kind === 'svc' ? r.s.updates : r.c && r.c.updates) || {}).available; }
+
+function renderApps() {
+  const running = services.filter(s => s.status === 'running').length;
+  $('sum').textContent = services.length ? `${running} of ${services.length} awake` : '';
+  const all = appRows();
+  const counts = { all: all.length, managed: services.length, unmanaged: all.length - services.length, updates: all.filter(hasUpdate).length };
+  document.querySelectorAll('#appFilter button').forEach(b => {
+    b.querySelector('span').textContent = containers.length || services.length ? counts[b.dataset.f] : '';
+  });
   const q = $('filter').value.trim().toLowerCase();
-  const rows = containers.filter(c => !q || (c.name + ' ' + c.image + ' ' + c.project).toLowerCase().includes(q));
+  const rows = all.filter(r => {
+    if (appFilter === 'managed' && r.kind !== 'svc') return false;
+    if (appFilter === 'unmanaged' && r.kind === 'svc') return false;
+    if (appFilter === 'updates' && !hasUpdate(r)) return false;
+    if (!q) return true;
+    const c = r.c || {};
+    return [r.s && r.s.name, c.name, c.image, c.project].join(' ').toLowerCase().includes(q);
+  });
   if (!rows.length) {
-    $('containers').innerHTML = `<div class="crow"><span class="sub">${containers.length ? 'No containers match.' : 'Loading containers…'}</span></div>`;
+    lastAppsHtml = '';
+    $('apps').innerHTML = `<div class="empty">${!containers.length && !services.length ? 'Loading apps…'
+      : appFilter === 'updates' && !q ? 'No updates waiting.' : 'No apps match.'}</div>`;
     return;
   }
-  $('containers').innerHTML = rows.map(c => {
-    const on = !!c.controlled_by;
-    const st = c.status === 'running' ? 'running' : 'stopped';
-    const check = c.companion_of
-      ? `<label class="check dis" title="Starts and sleeps together with ${esc(c.companion_of)}. Change this in ${esc(c.companion_of)}'s Edit window."><input type="checkbox" checked disabled> With ${esc(c.companion_of)}</label>`
-      : `<label class="check"><input type="checkbox" data-c="${esc(c.name)}" ${on ? 'checked' : ''}> ${on ? 'Stowaway Enabled' : 'Enable Stowaway'}</label>`;
-    return `<div class="crow ${on || c.companion_of ? 'on' : ''}">
-      ${check}
-      <div><div class="cname">${esc(c.name)}</div>
-        <div class="sub">${esc(c.image)}${c.project ? ' · ' + esc(c.project) : ''}${c.managed_by === 'truenas' ? '<span class="tag" title="Managed by TrueNAS Apps: Stowaway can start and stop it, but updates are left to TrueNAS">TrueNAS app</span>' : ''}</div></div>
-      <div class="ports">${esc(portsText(c))}</div>
-      <div><span class="pill ${st}">${st}</span></div>
-    </div>`;
-  }).join('');
+  const html = rows.map(r => r.kind === 'svc' ? svcPanel(r.s, r.c) : ctrPanel(r.c)).join('');
+  if (html !== lastAppsHtml) $('apps').innerHTML = lastAppsHtml = html;
 }
+
+function svcPanel(s, c) {
+  const st = stateOf(s), busy = !!s.transition;
+  const links = linksFor(s), link = links[0];
+  const comps = s.companions || [];
+  const isOpen = openComps.has(s.name);
+  const nameHtml = link
+    ? `<a class="nm" href="${esc(link)}" target="_blank" rel="noopener" title="Open ${esc(s.name)}">${esc(s.name)}${IC.ext}</a>`
+    : `<span class="nm" title="No link port: woken from Home Assistant or here">${esc(s.name)}</span>`;
+  const where = links.length ? links.map(u => u.replace(/^https?:\/\//, '')).join(', ') : 'no link';
+  const sub = [c ? c.image : null, where, s.via_macvlan ? 'macvlan' : null].filter(Boolean).join(' · ');
+  const act = st === 'running' || st === 'stopping'
+    ? `<button data-act="stop" data-n="${esc(s.name)}" ${busy ? 'disabled' : ''}>Sleep now</button>`
+    : `<button data-act="start" data-n="${esc(s.name)}" ${busy || st === 'missing' ? 'disabled' : ''}>Wake</button>`;
+  const release = s.forced === 'hold' ? `<button data-act="release" data-n="${esc(s.name)}" title="Stop keeping it awake">Release</button>` : '';
+  // Sleep column
+  const sl = [];
+  sl.push(s.idle_timeout > 0 ? chip('', IC.timer, `Sleeps after ${fmtMins(s.idle_timeout)}`) : chip('', IC.moon, 'Sleeps only when told'));
+  if (s.idle_timeout > 0 && s.busy_check !== false) sl.push(chip('', IC.busy, 'Awake while busy'));
+  (s.awake_hours || []).slice(0, 2).forEach(w => sl.push(chip('', IC.sun, hoursText(w))));
+  if ((s.awake_hours || []).length > 2) sl.push(chip('off', IC.sun, `+${s.awake_hours.length - 2} more awake hours`));
+  if (s.forced === 'hold') sl.push(chip('auto', IC.lock, s.forced_until ? `Kept awake until ${fmtWhen(s.forced_until)}` : 'Kept awake until released'));
+  if (s.block_wake) sl.push(chip('bad', IC.off, 'Won\'t wake when opened'));
+  const op = openedInfo(s.last_open);
+  const usage = st === 'running' && s.stats ? { cpu: s.stats.cpu, mem: s.stats.mem } : null;
+  let warn = '';
+  if (s.companion_error) warn += `<div class="warn">${esc(s.companion_error)}</div>`;
+  if (s.update_error) warn += `<div class="warn">${esc(s.update_error)}<button data-act="retryupdate" data-n="${esc(s.name)}">Try again next time</button></div>`;
+  if (s.warning) warn += `<div class="warn">${esc(s.warning)}${/Settings/.test(s.warning) ? '<button data-act="settings">Open System Settings</button>' : ''}</div>`;
+  if (s.error && s.error !== s.warning) warn += `<div class="err">${esc(s.error)}</div>`;
+  if (st === 'updating' && s.update) {
+    const u = s.update, pct = Math.round(u.pct || 0);
+    warn += `<div class="warn" style="color:var(--blue);background:var(--blue-bg)">Updating: ${u.total_bytes ? `${fmtBytes(u.done_bytes || 0)} of ${fmtBytes(u.total_bytes)} · ` : ''}${pct}%</div>`;
+  }
+  const compStats = s.companion_stats || {}, compStatus = s.companion_status || {};
+  const byName = Object.fromEntries(containers.map(x => [x.name, x]));
+  const compHtml = comps.length && isOpen ? `<div class="comps"><div class="col-h">Companions · wake and sleep with ${esc(s.name)}</div>${comps.map(n => {
+    const cs = compStatus[n] || (byName[n] || {}).status || 'missing', u = compStats[n] || (byName[n] || {}).usage;
+    const run = cs === 'running';
+    return `<div class="comp-row"><div class="cn"><b>${esc(n)}</b><span class="pill ${run ? 'c-green' : cs === 'missing' ? 'c-red' : 'c-gray'}">${run ? 'Running' : cs === 'missing' ? 'Missing' : 'Stopped'}</span>
+      <span class="dstate">${esc((byName[n] || {}).image || '')}</span></div>
+      <span class="use">CPU <b>${u ? u.cpu + '%' : '–'}</b></span><span class="use">Memory <b>${u ? fmtMB(u.mem) : '–'}</b></span></div>`;
+  }).join('')}</div>` : '';
+  return `<div class="app">
+    <div class="app-head">
+      ${comps.length ? `<button type="button" class="expander" data-act="comps" data-n="${esc(s.name)}" aria-expanded="${isOpen}" aria-label="${isOpen ? 'Hide' : 'Show'} ${comps.length} companion${comps.length > 1 ? 's' : ''} of ${esc(s.name)}" title="${comps.length} companion${comps.length > 1 ? 's' : ''}">${IC.chev}</button>` : ''}
+      <div class="app-title"><div class="app-name">${nameHtml}${stateLabel(s)}</div><div class="app-sub">${esc(sub)}</div></div>
+      <div class="app-actions">${act}${release}<button class="set iconbtn" data-act="edit" data-n="${esc(s.name)}">${IC.sliders}Settings</button></div>
+    </div>
+    ${warn}
+    <div class="app-cols">
+      <div class="app-col"><span class="col-h">Sleep</span>${sl.join('')}</div>
+      <div class="app-col"><span class="col-h">Updates</span>${updateChips(s.updates, true)}</div>
+      <div class="app-col"><span class="col-h">Usage</span>${usageHtml(usage, st)}</div>
+      <div class="app-col"><span class="col-h">${op.label}</span>${op.who ? `<span class="opened">${op.icon}${esc(op.who)}</span>` : ''}<span class="opened-sub">${esc(op.sub)}</span></div>
+    </div>
+    ${compHtml}
+  </div>`;
+}
+
+function ctrPanel(c) {
+  const run = c.status === 'running', link = unmanagedLink(c);
+  const nameHtml = link
+    ? `<a class="nm" href="${esc(link)}" target="_blank" rel="noopener" title="Open ${esc(c.name)}">${esc(c.name)}${IC.ext}</a>`
+    : `<span class="nm">${esc(c.name)}</span>`;
+  const sub = [c.image, portsText(c), c.managed_by === 'truenas' ? 'TrueNAS app' : null].filter(Boolean).join(' · ');
+  const pill = `<span class="pill ${run ? 'c-green' : 'c-gray'}">${run ? 'Running' : 'Stopped'}</span>`;
+  const m = c.maintenance;
+  return `<div class="app um">
+    <div class="app-head">
+      <div class="app-title"><div class="app-name">${nameHtml}${pill}</div><div class="app-sub">${esc(sub)}</div></div>
+      <div class="app-actions"><button class="manage iconbtn" data-act="manage" data-n="${esc(c.name)}">${IC.plus}Let Stowaway manage</button>
+        <button class="set iconbtn" data-act="ctr" data-n="${esc(c.name)}">${IC.sliders}Settings</button></div>
+    </div>
+    <div class="app-cols">
+      <div class="app-col"><span class="col-h">Sleep</span>${chip('off', IC.off, run ? 'Not managed, always on' : 'Not managed')}${m && m.next_restart_text ? chip('', IC.auto, `Restarts ${m.next_restart_text}`) : ''}</div>
+      <div class="app-col"><span class="col-h">Updates</span>${updateChips(c.updates, false)}</div>
+      <div class="app-col"><span class="col-h">Usage</span>${usageHtml(run ? c.usage : null, run ? 'running' : 'stopped')}</div>
+      <div class="app-col"><span class="col-h">Last opened by</span><span class="opened-sub">Not tracked: Stowaway isn't in front of it</span></div>
+    </div>
+  </div>`;
+}
+
+$('appFilter').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-f]');
+  if (!b) return;
+  appFilter = b.dataset.f;
+  document.querySelectorAll('#appFilter button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  renderApps();
+});
+$('filter').addEventListener('input', renderApps);
+
+$('apps').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-act]');
+  if (!b) return;
+  const name = b.dataset.n, act = b.dataset.act;
+  if (act === 'settings') return openSettings('net');
+  if (act === 'comps') {
+    openComps.has(name) ? openComps.delete(name) : openComps.add(name);
+    return renderApps();
+  }
+  if (act === 'manage') return openApp('add', containers.find(c => c.name === name));
+  if (act === 'ctr') return openApp('ctr', containers.find(c => c.name === name));
+  if (act === 'edit') {
+    const svc = services.find(s => s.name === name);
+    return openApp('svc', containers.find(c => c.name === svc.container), svc);
+  }
+  b.disabled = true;
+  try {
+    if (act === 'retryupdate') await api(`/services/${encodeURIComponent(name)}/retry-update`, { method: 'POST' });
+    else if (act === 'release') await api(`/services/${encodeURIComponent(name)}/hold`, { method: 'POST', body: JSON.stringify({}) });
+    else await api(`/services/${encodeURIComponent(name)}/${act}`, { method: 'POST' });
+  } catch (err) { alert(err.message); }
+  refresh();
+});
 
 async function refresh() {
   try {
@@ -908,14 +1306,36 @@ async function refresh() {
     if (d.username) $('who').innerHTML = `Signed in as <b>${esc(d.username)}</b>`;
     services = d.services;
     $('demo').hidden = !d.demo;
-    renderServices();
+    renderApps();
   } catch (e) { console.error(e); }
 }
 async function refreshContainers() {
-  try { containers = await api('/containers'); renderContainers(); } catch (e) { console.error(e); }
+  try { containers = await api('/containers'); renderApps(); } catch (e) { console.error(e); }
+}
+function portsText(c) {
+  if (c.network_mode === 'host') return 'host network';
+  if (c.macvlan_ip) return `macvlan ${c.macvlan_ip}` + (c.exposed.length ? `:${c.exposed[0]}` : '');
+  if (c.published.length) return 'port ' + c.published.map(([cp, hp]) => cp === hp ? `${hp}` : `${hp}→${cp}`).join(', ');
+  if (c.exposed.length) return c.exposed.join(', ') + ' (not published)';
+  return 'no ports';
 }
 
-/* ---------- control dialog ---------- */
+/* ---------- app settings window ---------- */
+let dlgMode = 'svc', dlgCtr = null, dlgTab = 'sleep', origSched = null, origCheck = null, origBlock = false;
+const TABS_FOR = { svc: ['sleep', 'awake', 'addr', 'comp', 'upd', 'dash', 'ha'], add: ['sleep', 'awake', 'addr', 'comp', 'upd'], ctr: ['upd'] };
+function showAppTab(t) {
+  if (!TABS_FOR[dlgMode].includes(t)) t = TABS_FOR[dlgMode][0];
+  dlgTab = t;
+  document.querySelectorAll('#appTabs > button').forEach(b => {
+    b.hidden = !TABS_FOR[dlgMode].includes(b.dataset.t);
+    b.setAttribute('aria-selected', String(b.dataset.t === t));
+  });
+  document.querySelectorAll('#dlg .pane').forEach(p => { p.hidden = p.dataset.p !== t; });
+  if (t === 'dash') renderDashTab();
+  if (t === 'ha') renderHaTab();
+}
+$('appTabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-t]'); if (b) showAppTab(b.dataset.t); });
+
 function portHint(c) {
   if (!c) return '';
   if (c.exposed.length) return `This container listens on: <b>${c.exposed.join(', ')}</b>.`;
@@ -931,27 +1351,45 @@ function linkHint(c, linkPort) {
   if (!linkPort && $('form').mode.value === 'manual')
     return 'No link port: it can only be woken from Home Assistant, the API or this dashboard, not by opening a link.';
   const url = `http://${host}:${linkPort || '…'}`;
-  let t = `You'll open it at <b>${esc(url)}</b>. Use that link in Heimdall, Homarr or a bookmark.`;
+  let t = `You'll open it at <b>${esc(url)}</b>. Use that link in bookmarks and dashboards.`;
   const hs = c && httpsFor(c.name);
   if (hs) t += ` Over HTTPS: <b>${esc(hs)}</b>.`;
-  if (c && c.macvlan_ip) {
-    t += ` Its own address <b>${esc(c.macvlan_ip)}</b> keeps working while it's awake, but won't wake it up.`;
-    return t;
-  }
+  if (c && c.macvlan_ip) return t + ` Its own address <b>${esc(c.macvlan_ip)}</b> keeps working while it's awake, but won't wake it up.`;
   const pub = c && c.published.length ? c.published[0][1] : null;
   if (pub) t += ` Its current address <b>:${pub}</b> keeps working while it's awake, but won't wake it up.`;
   return t;
 }
+function dlgItem() {
+  // what the open window is about: the container's name for schedules and update checks
+  return { name: editing ? editing.name : dlgCtr ? dlgCtr.name : '', container: editing ? editing.container : dlgCtr ? dlgCtr.name : '' };
+}
 
-function openControl(c, svc) {
+function openApp(mode, c, svc) {
   const f = $('form');
   f.reset();
   $('formErr').textContent = '';
-  editing = svc || null;
-  adding = svc ? null : c;
-  $('dlgTitle').textContent = svc ? `Edit ${svc.name}` : `Enable Stowaway for ${c.name}`;
-  $('saveBtn').textContent = svc ? 'Save' : 'Enable Stowaway';
-  $('release').hidden = !svc;
+  dlgMode = mode;
+  editing = mode === 'svc' ? svc : null;
+  adding = mode === 'add' ? c : null;
+  dlgCtr = c || null;
+  const name = svc ? svc.name : c.name;
+  $('dlgTitle').textContent = mode === 'add' ? `Let Stowaway manage ${name}` : name;
+  const pill = $('dlgPill');
+  pill.hidden = !svc && !c;
+  if (svc) {
+    const tmp = document.createElement('span');
+    tmp.innerHTML = stateLabel(svc);
+    pill.className = tmp.firstChild.className; pill.textContent = tmp.firstChild.textContent;
+  } else if (c) {
+    pill.className = `pill ${c.status === 'running' ? 'c-green' : 'c-gray'}`; pill.textContent = c.status === 'running' ? 'Running' : 'Stopped';
+  }
+  $('dlgSub').textContent = [c ? c.image : null, svc && linksFor(svc)[0] ? linksFor(svc)[0].replace(/^https?:\/\//, '') : (c ? portsText(c) : null)].filter(Boolean).join(' · ');
+  $('saveBtn').textContent = mode === 'add' ? 'Let Stowaway manage it' : 'Save';
+  $('release').hidden = mode !== 'svc';
+  $('release').textContent = `Stop managing ${name}`;
+  $('manageBox').hidden = mode !== 'ctr';
+  $('manageText').innerHTML = `Stowaway doesn't put <b>${esc(name)}</b> to sleep. Restarts and updates work anyway; the other settings appear once it does.`;
+  // sleep
   $('portList').innerHTML = (c ? c.exposed : []).map(p => `<option value="${p}">`).join('');
   $('portHint').innerHTML = portHint(c);
   if (svc) {
@@ -963,174 +1401,304 @@ function openControl(c, svc) {
     f.upstream.value = svc.custom_upstream || '';
     f.style.value = svc.start_page || '';
     f.delay.value = svc.ready_delay ?? '';
-  } else {
+  } else if (c) {
     f.link_port.value = c.suggested_link_port || '';
     f.port.value = c.suggested_port || 80;
     f.mode.value = 'auto';
     f.idle.value = 10;
   }
+  $('sleepIntro').textContent = `How ${name} goes to sleep. Opening its link wakes it again.`;
+  origBlock = !!(svc && svc.block_wake);
+  f.block.checked = origBlock;
+  $('blockBox').hidden = $('holdBox').hidden = mode !== 'svc';
+  renderHold(svc);
   syncMode();
-  renderCompanions(c, svc);
+  if (mode !== 'ctr') renderCompanions(c, svc);
+  // staying awake
   const cpuDef = settingsCache.busy_cpu ?? 5, netDef = settingsCache.busy_net ?? 50;
   f.busy_cpu.placeholder = `default ${cpuDef}`;
   f.busy_net.placeholder = `default ${netDef}`;
   f.busy_check.checked = svc ? svc.busy_check !== false : true;
-  f.open_mode.value = (svc && svc.open_mode) || 'proxy';
-  renderOpenHint();
-  f.upd_on.checked = !!(svc && svc.update_on_wake);
-  f.upd_every.value = svc && svc.update_on_wake ? svc.update_every : 24;
-  $('updCheck').hidden = !svc;
-  renderUpdHint(svc, c);
   f.busy_cpu.value = svc && svc.busy_cpu != null ? svc.busy_cpu : '';
   f.busy_net.value = svc && svc.busy_net != null ? svc.busy_net : '';
   syncBusyRow();
-  let bh = 'Checked every few seconds. Leave the numbers empty to use the defaults from Settings.';
-  if (svc && svc.stats) bh = `Right now: CPU <b>${svc.stats.cpu}%</b>${svc.stats.net != null ? ` · network <b>${fmtRate(svc.stats.net)}</b>` : ''}. ` + bh;
+  let bh = 'Checked every few seconds. Leave the numbers empty to use the defaults from System Settings.';
+  if (svc && svc.stats) bh = `Right now: CPU <b>${svc.stats.cpu}%</b>${svc.stats.net != null ? ` · network <b>${fmtRate(svc.stats.net)}</b>` : ''}${svc.busy ? ', so it counts as busy' : ''}. ` + bh;
   if (c && c.network_mode === 'host') bh += ' Network use can\'t be measured for containers on the host network, so only CPU is checked.';
   $('busyHint').innerHTML = bh;
   $('hours').innerHTML = '';
   (svc ? svc.awake_hours || [] : []).forEach(w => $('hours').appendChild(hourRow(w)));
-  $('hoursHint').innerHTML = `Stowaway starts the app when these hours begin and keeps it awake until they end. ` +
-    `Times are in <b>${esc(settingsCache.timezone_effective || 'UTC')}</b> (change it in Settings).`;
+  $('hoursHint').innerHTML = `Stowaway starts it when these hours begin and keeps it awake until they end. ` +
+    `Times are in <b>${esc(settingsCache.timezone_effective || 'UTC')}</b> (System Settings → General).`;
+  // address
+  f.open_mode.value = (svc && svc.open_mode) || 'proxy';
+  renderOpenHint();
   $('linkHint').innerHTML = linkHint(c, f.link_port.value);
-  f.link_port.oninput = () => { $('linkHint').innerHTML = linkHint(c, f.link_port.value); };
+  f.link_port.oninput = () => { $('linkHint').innerHTML = linkHint(c, f.link_port.value); renderNotes(); };
+  // updates
+  f.upd_on.checked = !!(svc && svc.update_on_wake);
+  f.upd_every.value = svc && svc.update_on_wake ? svc.update_every : 24;
+  $('wakeUpdBox').hidden = mode === 'ctr';
+  const u = (svc ? svc.updates : c && c.updates) || {};
+  origCheck = u.check_every ?? (mode === 'add' ? 24 : 0);
+  f.chk_every.value = mode === 'add' ? 24 : origCheck;
+  loadSchedule(dlgItem().container);
+  renderUpdHint(svc, c);
+  renderUpdPane();
+  renderNotes();
+  showAppTab(mode === 'ctr' ? 'upd' : (mode === dlgModeLast.mode && dlgModeLast.name === name ? dlgTab : 'sleep'));
+  dlgModeLast = { mode, name };
   $('dlg').showModal();
+}
+let dlgModeLast = {};
+function renderNotes() {
+  const f = $('form'), svc = editing;
+  const set = (id, t, hot) => { const el = $(id); el.textContent = t || ''; el.classList.toggle('hot', !!hot); };
+  set('nt-sleep', f.mode.value === 'manual' ? 'when told' : `${f.idle.value || 10} min`);
+  set('nt-awake', [f.busy_check.checked && f.mode.value !== 'manual' ? 'busy' : null, $('hours').children.length ? 'hours' : null].filter(Boolean).join(', '));
+  set('nt-addr', f.link_port.value ? ':' + f.link_port.value : '');
+  const nComp = $('compList').querySelectorAll('input[data-comp]:checked').length;
+  set('nt-comp', nComp ? String(nComp) : '');
+  const u = (svc ? svc.updates : dlgCtr && dlgCtr.updates) || {};
+  set('nt-upd', u.available ? 'update' : '', u.available);
+  const da = dashApps || {}, n = svc ? ['homarr', 'heimdall', 'homepage', 'glance'].filter(k => (da[k] || []).includes(svc.name)).length : 0;
+  set('nt-dash', n ? String(n) : '');
 }
 function syncMode() {
   const f = $('form'), manual = f.mode.value === 'manual';
   $('idleWrap').hidden = manual;
-  $('busySection').hidden = manual;          // only matters for sleeping when idle
+  $('busySection').hidden = manual;
+  $('busyOff').hidden = !manual;
   $('linkOpt').textContent = manual ? 'optional' : '';
   $('modeHint').innerHTML = manual
-    ? 'Stowaway never puts it to sleep by itself. Home Assistant (for example when nobody is home), the API, scheduled maintenance or the <b>Sleep now</b> button decide. Opening its link still wakes it, unless it has been switched off with <i>don\'t wake</i>.'
+    ? 'Stowaway never puts it to sleep by itself. Home Assistant (for example when nobody is home), the API, a scheduled restart or the <b>Sleep now</b> button decide.'
     : 'It sleeps once nobody has used it, and it hasn\'t been busy, for the time below. Home Assistant and the API can still wake it or put it to sleep at any time.';
+  renderNotes();
 }
+document.querySelectorAll('#form input[name=mode]').forEach(r => r.addEventListener('change', () => {
+  syncMode();
+  $('linkHint').innerHTML = linkHint(adding || dlgCtr, $('form').link_port.value);
+}));
+$('form').idle.addEventListener('input', renderNotes);
+function syncBusyRow() { $('busyRow').style.opacity = $('form').busy_check.checked ? 1 : .45; renderNotes(); }
+$('form').busy_check.addEventListener('change', syncBusyRow);
+$('compList').addEventListener('change', renderNotes);
 
-$('containers').addEventListener('change', async (e) => {
-  const cb = e.target.closest('input[type=checkbox][data-c]');
-  if (!cb) return;
-  const c = containers.find(x => x.name === cb.dataset.c);
-  if (cb.checked) {
-    cb.checked = false;            // only ticks once saved
-    openControl(c, null);
-  } else {
-    cb.checked = true;             // only unticks once confirmed
-    await release(services.find(s => s.name === c.controlled_by), c);
-  }
+function renderHold(svc) {
+  if (!svc) return;
+  const held = svc.forced === 'hold';
+  $('holdState').innerHTML = held
+    ? `Kept awake ${svc.forced_until ? 'until <b>' + esc(fmtWhen(svc.forced_until)) + '</b>' : '<b>until you release it</b>'}.`
+    : 'Wake it now and don\'t put it to sleep for a while. Happens right away, no need to Save.';
+  $('holdRelease').hidden = !held;
+}
+$('holdBtns').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-hold]');
+  if (!b || !editing) return;
+  const v = b.dataset.hold;
+  b.disabled = true;
+  try {
+    editing = await api(`/services/${encodeURIComponent(editing.name)}/hold`, { method: 'POST',
+      body: JSON.stringify(v === 'release' ? {} : v === 'forever' ? { forever: true } : { minutes: Number(v) }) });
+    renderHold(editing);
+    $('form').block.checked = origBlock = !!editing.block_wake;
+  } catch (err) { $('formErr').textContent = err.message; }
+  b.disabled = false;
+  refresh();
 });
 
-async function release(svc, c) {
-  if (!svc) return;
-  if (!confirm(`Disable Stowaway for ${svc.name}?\n\nStowaway will no longer wake it or put it to sleep, and its link port ${svc.link_port || ''} will close. The container itself isn't changed.`)) return false;
+async function release(svc) {
+  if (!svc) return false;
+  if (!confirm(`Stop managing ${svc.name}?\n\nStowaway will no longer wake it or put it to sleep, and its link port ${svc.link_port || ''} will close. The container itself isn't changed, and its restart schedule stays.`)) return false;
   const asleep = svc.status !== 'running';
   const wake = asleep && confirm(`${svc.name} is asleep right now. Start it so it keeps running normally?`);
   try {
     await api(`/services/${encodeURIComponent(svc.name)}${wake ? '?start=true' : ''}`, { method: 'DELETE' });
-  } catch (err) { alert(err.message); }
+  } catch (err) { alert(err.message); return false; }
   await Promise.all([refresh(), refreshContainers()]);
   return true;
 }
-
-$('release').onclick = async () => {
-  const svc = editing;
-  if (await release(svc, containers.find(x => x.name === svc.container))) $('dlg').close();
-};
-$('cancel').onclick = () => $('dlg').close();
+$('release').onclick = async () => { if (await release(editing)) $('dlg').close(); };
+$('cancel').onclick = $('dlgClose').onclick = () => $('dlg').close();
+$('manageBtn').onclick = () => { const c = dlgCtr; $('dlg').close(); openApp('add', c); };
 
 $('form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
-  const body = {
-    link_port: Number(f.link_port.value) || null,
-    port: Number(f.port.value) || 80,
-    idle_timeout: f.mode.value === 'manual' ? 0 : Math.max(60, Math.round(Number(f.idle.value || 10) * 60)),
-    hosts: f.hosts.value.split(',').map(h => h.trim()).filter(Boolean),
-    upstream: f.upstream.value.trim() || null,
-    start_page: f.style.value || null,
-    ready_delay: f.delay.value === '' ? null : Number(f.delay.value),
-    busy_check: f.busy_check.checked,
-    update_on_wake: f.upd_on.checked,
-    open_mode: f.open_mode.value,
-    update_every: Number(f.upd_every.value || 0),
-    busy_cpu: f.busy_cpu.value === '' ? null : Number(f.busy_cpu.value),
-    busy_net: f.busy_net.value === '' ? null : Number(f.busy_net.value),
-    awake_hours: readHours(),
-    companions: [...$('compList').querySelectorAll('input[data-comp]:checked')].map(x => x.dataset.comp),
-  };
-  if (body.awake_hours.some(w => !w.days.length)) { $('formErr').textContent = 'Pick at least one day for each awake-hours entry.'; return; }
-  if (body.awake_hours.some(w => !w.from || !w.to || w.from === w.to)) { $('formErr').textContent = 'Each awake-hours entry needs different start and end times.'; return; }
+  $('formErr').textContent = '';
+  const fail = (msg, tab) => { $('formErr').textContent = msg; if (tab) showAppTab(tab); };
+  const item = dlgItem();
+  let svcBody = null;
+  if (dlgMode !== 'ctr') {
+    if (!f.port.value) return fail('Enter the app port (Address & opening).', 'addr');
+    svcBody = {
+      link_port: Number(f.link_port.value) || null,
+      port: Number(f.port.value) || 80,
+      idle_timeout: f.mode.value === 'manual' ? 0 : Math.max(60, Math.round(Number(f.idle.value || 10) * 60)),
+      hosts: f.hosts.value.split(',').map(h => h.trim()).filter(Boolean),
+      upstream: f.upstream.value.trim() || null,
+      start_page: f.style.value || null,
+      ready_delay: f.delay.value === '' ? null : Number(f.delay.value),
+      busy_check: f.busy_check.checked,
+      update_on_wake: f.upd_on.checked,
+      open_mode: f.open_mode.value,
+      update_every: Number(f.upd_every.value || 0),
+      busy_cpu: f.busy_cpu.value === '' ? null : Number(f.busy_cpu.value),
+      busy_net: f.busy_net.value === '' ? null : Number(f.busy_net.value),
+      awake_hours: readHours(),
+      companions: [...$('compList').querySelectorAll('input[data-comp]:checked')].map(x => x.dataset.comp),
+    };
+    if (svcBody.awake_hours.some(w => !w.days.length)) return fail('Pick at least one day for each awake-hours entry.', 'awake');
+    if (svcBody.awake_hours.some(w => !w.from || !w.to || w.from === w.to)) return fail('Each awake-hours entry needs different start and end times.', 'awake');
+  }
+  const sched = readSchedule();
+  if (sched && sched.freq !== 'off' && !sched.time) return fail('Pick a time for the scheduled restart.', 'upd');
+  $('saveBtn').disabled = true;
   try {
-    if (editing) await api(`/services/${encodeURIComponent(editing.name)}`, { method: 'PATCH', body: JSON.stringify(body) });
-    else await api('/services', { method: 'POST', body: JSON.stringify({ name: adding.name, container: adding.name, ...body }) });
+    if (dlgMode === 'svc') await api(`/services/${encodeURIComponent(editing.name)}`, { method: 'PATCH', body: JSON.stringify(svcBody) });
+    if (dlgMode === 'add') await api('/services', { method: 'POST', body: JSON.stringify({ name: adding.name, container: adding.name, ...svcBody }) });
+    if (dlgMode === 'svc' && f.block.checked !== origBlock)
+      await api(`/services/${encodeURIComponent(editing.name)}/block`, { method: 'POST', body: JSON.stringify({ on: f.block.checked }) });
+    if (JSON.stringify(sched) !== JSON.stringify(origSched))
+      await api(`/maintenance/${encodeURIComponent(item.container)}`, { method: 'PUT', body: JSON.stringify(sched) });
+    const chk = Number(f.chk_every.value || 0);
+    if (dlgMode === 'add' || chk !== origCheck)
+      await api(`/updates/${encodeURIComponent(item.container)}`, { method: 'PUT', body: JSON.stringify({ check_every: chk }) });
     $('dlg').close();
     await Promise.all([refresh(), refreshContainers()]);
   } catch (err) { $('formErr').textContent = err.message; }
+  $('saveBtn').disabled = false;
 });
 
-$('list').addEventListener('click', async (e) => {
-  const b = e.target.closest('button[data-act]');
-  if (!b) return;
-  const name = b.dataset.n, act = b.dataset.act;
-  if (act === 'settings') return $('settingsBtn').click();
-  if (act === 'holdmenu') return openMenu(b, name);
-  if (act === 'unblock') {
-    b.disabled = true;
-    try { await api(`/services/${encodeURIComponent(name)}/block`, { method: 'POST', body: JSON.stringify({ on: false }) }); } catch (err) { alert(err.message); }
-    return refresh();
-  }
-  if (act === 'retryupdate') {
-    b.disabled = true;
-    try { await api(`/services/${encodeURIComponent(name)}/retry-update`, { method: 'POST' }); } catch (err) { alert(err.message); }
-    return refresh();
-  }
-  if (act === 'release') {
-    b.disabled = true;
-    try { await api(`/services/${encodeURIComponent(name)}/hold`, { method: 'POST', body: JSON.stringify({}) }); }
-    catch (err) { alert(err.message); }
-    return refresh();
-  }
-  const svc = services.find(s => s.name === name);
-  if (act === 'edit') return openControl(containers.find(c => c.name === svc.container), svc);
-  b.disabled = true;
-  try { await api(`/services/${encodeURIComponent(name)}/${act}`, { method: 'POST' }); }
-  catch (err) { alert(err.message); }
-  refresh();
-});
-
-$('filter').addEventListener('input', renderContainers);
-
-/* ---------- keep awake menu ---------- */
-let menuFor = null;
-function openMenu(btn, name) {
-  const m = $('menu'), r = btn.getBoundingClientRect();
-  menuFor = name;
-  m.hidden = false;
-  const w = m.offsetWidth, h = m.offsetHeight;
-  m.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)) + 'px';
-  m.style.top = (r.bottom + h + 8 > window.innerHeight ? r.top - h - 6 : r.bottom + 6) + 'px';
+/* ---------- updates & restarts tab ---------- */
+let schedItem = null;
+function mdayOptions() {
+  const sfx = (n) => (n % 100 >= 11 && n % 100 <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+  return Array.from({ length: 28 }, (_, k) => `<option value="${k + 1}">${k + 1}${sfx(k + 1)}</option>`).join('') +
+    '<option value="last">Last day of the month</option>';
 }
-function closeMenu() { $('menu').hidden = true; menuFor = null; }
-document.addEventListener('click', (e) => {
-  if (!$('menu').hidden && !e.target.closest('#menu') && !e.target.closest('[data-act="holdmenu"]')) closeMenu();
-});
-window.addEventListener('scroll', closeMenu, { passive: true });
-window.addEventListener('resize', closeMenu);
-$('menu').addEventListener('click', async (e) => {
-  const b = e.target.closest('button[data-hold]');
-  if (!b || !menuFor) return;
-  const name = menuFor, v = b.dataset.hold;
-  closeMenu();
-  if (v === 'off') {
-    try { await api(`/services/${encodeURIComponent(name)}/stop?block=true`, { method: 'POST' }); } catch (err) { alert(err.message); }
-    return refresh();
-  }
+$('form').mday.innerHTML = mdayOptions();
+const RES = { ok: 'Restarted', updated: 'Updated', skipped: 'Skipped', missed: 'Missed', failed: 'Failed', rolled_back: 'Put back' };
+async function loadSchedule(name) {
+  const f = $('form');
+  schedItem = null;
+  f.freq.value = 'off'; f.weekday.value = '6'; f.mday.value = '1'; f.time.value = '04:00'; f.sch_update.checked = false; f.busy_wait.value = 6;
+  origSched = readSchedule();
+  syncSchedule();
+  if (!name) return;
   try {
-    await api(`/services/${encodeURIComponent(name)}/hold`, { method: 'POST',
-      body: JSON.stringify(v === 'forever' ? { forever: true } : { minutes: Number(v) }) });
-  } catch (err) { alert(err.message); }
-  refresh();
+    const d = await api('/maintenance');
+    schedItem = d.items.find(i => i.name === name) || null;
+    schedTz = d.timezone;
+  } catch (e) { return; }
+  const s = (schedItem && schedItem.schedule) || null;
+  if (s) {
+    f.freq.value = s.freq; f.weekday.value = String(s.weekday ?? 6); f.mday.value = String(s.mday ?? 1);
+    f.time.value = s.time || '04:00'; f.sch_update.checked = !!s.update; f.busy_wait.value = s.busy_wait ?? 6;
+  }
+  origSched = readSchedule();
+  syncSchedule();
+}
+let schedTz = '';
+function readSchedule() {
+  const f = $('form');
+  if (f.freq.value === 'off') return { freq: 'off', time: '04:00', weekday: 6, mday: 1, update: false, busy_wait: 6 };
+  return { freq: f.freq.value, time: f.time.value, weekday: Number(f.weekday.value),
+    mday: f.mday.value === 'last' ? 'last' : Number(f.mday.value), update: f.sch_update.checked, busy_wait: Number(f.busy_wait.value || 0) };
+}
+function syncSchedule() {
+  const f = $('form'), freq = f.freq.value, off = freq === 'off';
+  $('mOpts').hidden = off; $('mTime').hidden = off;
+  $('mWeekday').hidden = freq !== 'weekly';
+  $('mMday').hidden = freq !== 'monthly';
+  const i = schedItem, svc = editing;
+  let uh = 'Downloads it first while it keeps running, so it\'s only down for the swap.';
+  if (svc && svc.status !== 'running') uh += ' If it\'s asleep then, it\'s started to check the new version works and put back to sleep.';
+  if ((i && i.managed_by === 'truenas') || (dlgCtr && dlgCtr.managed_by === 'truenas')) uh = '<span style="color:var(--warn)">This is a TrueNAS app, so updates are left to TrueNAS (Apps page). Scheduled restarts still work.</span>';
+  $('mUpdHint').innerHTML = uh;
+  const bw = Number(f.busy_wait.value || 0);
+  $('mBusyHint').innerHTML = bw
+    ? `Busy means CPU above <b>${settingsCache.busy_cpu ?? 5}%</b> or network above <b>${settingsCache.busy_net ?? 50} KB/s</b>${svc ? ', or someone using it through Stowaway' : ''}. After ${bw} hour${bw === 1 ? '' : 's'} it's skipped until next time.`
+    : 'Restarts at the scheduled time even if it\'s in the middle of something.';
+  let nx = '';
+  if (!off) {
+    nx = `Times are in <b>${esc(schedTz || settingsCache.timezone_effective || 'UTC')}</b>.`;
+    if (i && i.schedule && i.next_run && JSON.stringify(readSchedule()) === JSON.stringify(origSched)) nx = `Next: <b>${esc(fmtWhen(i.next_run))}</b>. ` + nx;
+    if (freq === 'monthly') nx += ' Days 29–31 aren\'t offered since not every month has them; use <i>Last day</i> instead.';
+  }
+  if (i && i.last) nx += `${nx ? '<br>' : ''}Last run ${esc(agoText(i.last.at))}: <b>${esc(RES[i.last.result] || i.last.result)}</b>. ${esc(i.last.message)}`;
+  if (i && i.waiting) nx += `<br><span style="color:var(--warn)">Waiting: ${esc(i.waiting.replace(/^busy: /, ''))}. Checked again every 10 minutes.</span>`;
+  if (i && i.progress) nx += `<br><span style="color:var(--blue)">Working on it now…</span>`;
+  $('mNext').innerHTML = nx;
+  $('mRun').hidden = dlgMode === 'add';
+  renderNotes();
+}
+['freq', 'busy_wait', 'weekday', 'mday', 'time'].forEach(n => $('form')[n].addEventListener('input', syncSchedule));
+$('form').sch_update.addEventListener('change', syncSchedule);
+$('mRun').onclick = async () => {
+  const name = dlgItem().container, running = dlgCtr ? dlgCtr.status === 'running' : editing && editing.status === 'running';
+  if (!running && !editing) { $('formErr').textContent = `${name} isn't running, so there's nothing to restart.`; return; }
+  if (!confirm(running ? `Restart ${name} now? It restarts right away, even if it's busy.` : `${name} is asleep. Start it and restart it now?`)) return;
+  try { await api(`/maintenance/${encodeURIComponent(name)}/run`, { method: 'POST' }); $('mNext').innerHTML += '<br><span style="color:var(--blue)">Restarting…</span>'; }
+  catch (err) { $('formErr').textContent = err.message; }
+};
+function renderUpdPane() {
+  const svc = editing, u = (svc ? svc.updates : dlgCtr && dlgCtr.updates) || {};
+  const name = dlgItem().container;
+  let h = '';
+  if (dlgMode === 'add') h = '';
+  else if (u.installing) h = `<div class="updbanner">${IC.down}<span><b>Installing an update…</b> This takes a minute or two.</span></div>`;
+  else if (u.available) {
+    const asleepUm = dlgMode === 'ctr' && dlgCtr.status !== 'running';
+    h = `<div class="updbanner">${IC.down}<span><b>Update available.</b> Found ${esc(agoText(u.checked_at))}. ${u.auto === 'schedule' ? `It installs at the next scheduled restart (${esc(u.next_restart_text || '')}).` : u.auto === 'wake' ? 'It installs the next time it wakes.' : 'Turn on auto-update below, or install it now.'}</span>
+      ${asleepUm ? '<span style="flex:0 1 auto;font-size:13px">Start it to update it.</span>' : '<button type="button" id="updNow">Update now</button>'}</div>`;
+  } else if (u.failed_before) {
+    h = `<div class="updbanner">${IC.alert}<span>A newer version failed to start last time, so it's being skipped.</span><button type="button" id="updAllow">Allow that version next time</button></div>`;
+  } else if (u.status === 'current') {
+    h = `<div class="updbanner ok">${IC.check}<span>Up to date. Checked ${esc(agoText(u.checked_at))}.</span></div>`;
+  }
+  $('updBanner').innerHTML = h;
+  const chk = Number($('form').chk_every.value || 0);
+  $('chkHint').innerHTML = (chk ? `Asks the image registry about a newer version about every ${chk} hours, without installing it. The main page then shows <b>Update available</b>.`
+    : 'Turned off: the main page won\'t show when an update is available (auto-update still checks when it runs).') +
+    (u.checked_at ? ` Last checked ${esc(agoText(u.checked_at))}${u.status === 'error' ? `: couldn't check (${esc(u.detail || 'no answer')})` : u.status === 'unsupported' ? `: ${esc(u.detail || 'can\'t update this image')}` : ''}.` : '');
+  $('updCheck').hidden = dlgMode === 'add';
+  void name;
+}
+$('form').chk_every.addEventListener('input', renderUpdPane);
+$('updBanner').addEventListener('click', async (e) => {
+  const name = dlgItem().container;
+  if (e.target.closest('#updNow')) {
+    if (!confirm(`Update ${name} now? It restarts with the new version${editing && editing.status !== 'running' ? ' (it\'s started to check the new version works, then put back to sleep)' : ''}.`)) return;
+    try {
+      await api(`/maintenance/${encodeURIComponent(name)}/run?update=true`, { method: 'POST' });
+      $('updBanner').innerHTML = `<div class="updbanner">${IC.down}<span><b>Updating…</b> You can close this window; the main page shows when it's done.</span></div>`;
+      setTimeout(refresh, 1500);
+    } catch (err) { $('formErr').textContent = err.message; }
+  }
+  if (e.target.closest('#updAllow')) {
+    try { await api(`/maintenance/${encodeURIComponent(name)}/retry-update`, { method: 'POST' }); $('updBanner').innerHTML = ''; refresh(); refreshContainers(); }
+    catch (err) { $('formErr').textContent = err.message; }
+  }
 });
-
+function renderUpdHint(svc, c) {
+  const f = $('form');
+  $('updEveryWrap').style.opacity = f.upd_on.checked ? 1 : .45;
+  const image = (svc && svc.update_info && svc.update_info.ref) || (c && c.image) || 'its image';
+  $('updHint').innerHTML = `If <b>${esc(image)}</b> has a newer version when it wakes, visitors see an <i>Updating</i> page while it downloads, then your start page.`;
+}
+$('form').upd_on.addEventListener('change', () => renderUpdHint(editing, dlgCtr));
+$('updCheck').onclick = async () => {
+  const b = $('updCheck'), name = dlgItem().container;
+  b.disabled = true; b.textContent = 'Checking…';
+  try {
+    const u = await api(`/updates/${encodeURIComponent(name)}/check`, { method: 'POST' });
+    if (editing) editing.updates = u; else if (dlgCtr) dlgCtr.updates = u;
+    renderUpdPane(); renderNotes();
+    refresh(); refreshContainers();
+  } catch (err) { $('formErr').textContent = err.message; }
+  b.disabled = false; b.textContent = 'Check now';
+};
 /* ---------- awake hours editor ---------- */
 function hourRow(w) {
   const div = document.createElement('div');
@@ -1147,20 +1715,17 @@ $('hours').addEventListener('click', (e) => {
   if (d) { d.classList.toggle('on'); d.setAttribute('aria-pressed', d.classList.contains('on')); return; }
   const rm = e.target.closest('.rm');
   if (rm) rm.closest('.hrow').remove();
+  renderNotes();
 });
-$('addHours').onclick = () => $('hours').appendChild(hourRow({ days: [0, 1, 2, 3, 4, 5, 6], from: '18:00', to: '23:00' }));
+$('addHours').onclick = () => { $('hours').appendChild(hourRow({ days: [0, 1, 2, 3, 4, 5, 6], from: '18:00', to: '23:00' })); renderNotes(); };
 function readHours() {
   return [...$('hours').querySelectorAll('.hrow')].map(r => ({
     days: [...r.querySelectorAll('.day.on')].map(b => Number(b.dataset.d)),
     from: r.querySelector('.from').value, to: r.querySelector('.to').value,
   }));
 }
-function syncBusyRow() { $('busyRow').style.opacity = $('form').busy_check.checked ? 1 : .45; }
-$('form').busy_check.addEventListener('change', syncBusyRow);
-$('form').mode.addEventListener('change', () => { syncMode(); $('linkHint').innerHTML = linkHint(adding || containers.find(x => editing && x.name === editing.container), $('form').link_port.value); });
-
 /* ---------- settings ---------- */
-$('settingsBtn').onclick = async () => {
+async function openSettings(tab = 'general') {
   $('setErr').textContent = '';
   $('statusEx').textContent = `${location.origin}${location.pathname.replace(/\/$/, '')}/status/NAME`;
   try {
@@ -1192,7 +1757,7 @@ $('settingsBtn').onclick = async () => {
     syncHttps();
     loadCert();
     loadDiag();
-    $('accountSection').hidden = !lastUsername;
+    $('setAcctTab').hidden = !lastUsername;
     resetAccountForm(lastUsername);
     $('setForm').bcpu.value = st.busy_cpu ?? 5;
     $('setForm').bnet.value = st.busy_net ?? 50;
@@ -1213,9 +1778,13 @@ $('settingsBtn').onclick = async () => {
       + (st.macvlan_shim_ip_locked ? '<b>Set by MACVLAN_HELPER_IP in docker-compose.yml</b>; change it there. ' : '')
       + 'Not needed if the server can already reach them, for example with Unraid\'s <i>Host access to custom networks</i> or a macvlan shim you set up yourself; Stowaway uses that automatically.';
   } catch (e) { $('setErr').textContent = e.message; }
-  $('setDlg').showModal();
-};
-$('setCancel').onclick = () => $('setDlg').close();
+  showSetTab(tab);
+  $('tokNew').innerHTML = '';
+  loadTokens();
+  $('haAddr').textContent = location.host;
+  $('homarrWidget').href = `${API}/homarr/widget?base=${encodeURIComponent(sbFor('homarr'))}`;
+  if (!$('setDlg').open) $('setDlg').showModal();
+}
 function toggleCustom() { $('customWrap').hidden = $('setForm').style.value !== 'custom'; }
 $('setForm').style.addEventListener('change', toggleCustom);
 function preview(page) {
@@ -1296,11 +1865,11 @@ function renderSavings() {
   $('sv-note').innerHTML = note;
 }
 async function refreshSavings() {
-  try { svData = await api('/savings'); renderSavings(); } catch (e) { console.error(e); }
+  try { svData = await api('/savings'); if (svData.host) hostInfo = svData.host; renderSavings(); } catch (e) { console.error(e); }
 }
-document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+document.querySelectorAll('#savings .seg button').forEach(b => b.addEventListener('click', () => {
   svPeriod = b.dataset.p;
-  document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  document.querySelectorAll('#savings .seg button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
   renderSavings();
 }));
 
@@ -1315,7 +1884,7 @@ function directFor(svc, c, port) {
   return { reason: `port ${port} isn't published on the server and the app isn't on a macvlan network, so browsers have no address to reach it directly` };
 }
 function renderOpenHint() {
-  const f = $('form'), svc = editing, c = svc ? containers.find(x => x.name === svc.container) : adding;
+  const f = $('form'), svc = editing, c = svc ? containers.find(x => x.name === svc.container) : adding || dlgCtr;
   const d = directFor(svc, c, Number(f.port.value) || 80);
   const where = d && d.port ? `http://${esc(d.host || host)}:${d.port}` : null;
   let h;
@@ -1333,38 +1902,6 @@ function renderOpenHint() {
 }
 $('form').open_mode.addEventListener('change', renderOpenHint);
 $('form').port.addEventListener('input', renderOpenHint);
-
-/* ---------- updates ---------- */
-function renderUpdHint(svc, c) {
-  const f = $('form');
-  $('updEveryWrap').style.opacity = f.upd_on.checked ? 1 : .45;
-  const image = (svc && svc.update_info && svc.update_info.ref) || (c && c.image) || 'its image';
-  let h = `If <b>${esc(image)}</b> has a newer version, visitors see an <i>Updating</i> page while it downloads, then your start page. ` +
-          `Settings, volumes and networks are kept, and if the new version won't start, the previous one is put back.`;
-  const i = svc && svc.update_info;
-  if (i && i.at) {
-    const when = ago(Date.now() / 1000 + offset - i.at);
-    const state = i.status === 'current' ? '<span style="color:var(--ok)">up to date</span>'
-      : i.status === 'update' ? (i.remote === svc.update_skip ? 'a newer version exists, but it failed last time'
-                                                              : '<span style="color:#8b5cf6">a newer version is ready</span>, it installs the next time the app wakes')
-      : i.status === 'unsupported' ? `can't update automatically: ${esc(i.detail)}`
-      : `couldn't check: ${esc(i.detail || 'no answer')}`;
-    h += `<br>Last checked ${when}: ${state}.`;
-  }
-  $('updHint').innerHTML = h;
-}
-$('form').upd_on.addEventListener('change', () => renderUpdHint(editing, containers.find(x => editing && x.name === editing.container)));
-$('updCheck').onclick = async () => {
-  if (!editing) return;
-  const b = $('updCheck');
-  b.disabled = true; b.textContent = 'Checking…';
-  try {
-    editing = await api(`/services/${encodeURIComponent(editing.name)}/check-update`, { method: 'POST' });
-    renderUpdHint(editing, containers.find(x => x.name === editing.container));
-    refresh();
-  } catch (err) { $('formErr').textContent = err.message; }
-  b.disabled = false; b.textContent = 'Check now';
-};
 
 /* ---------- account ---------- */
 $('signOut').onclick = async () => {
@@ -1464,168 +2001,6 @@ $('certBtn').onclick = async () => {
   b.disabled = false;
 };
 
-/* ---------- tabs ---------- */
-let tab = location.hash === '#maintenance' ? 'maint' : 'apps';
-function showTab(t) {
-  tab = t;
-  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
-  $('tab-apps').hidden = t !== 'apps';
-  $('tab-maint').hidden = t !== 'maint';
-  history.replaceState(null, '', t === 'maint' ? '#maintenance' : location.pathname + location.search);
-  if (t === 'maint') refreshMaint();
-}
-document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
-
-/* ---------- maintenance ---------- */
-let mData = null, mEditing = null;
-const RES = { ok: 'Restarted', updated: 'Updated', skipped: 'Skipped', missed: 'Missed', rolled_back: 'Rolled back', failed: 'Failed' };
-const PHASE = { starting: 'Starting', 'checking for updates': 'Checking for updates', downloading: 'Downloading new version',
-  unpacking: 'Unpacking', installing: 'Installing', restarting: 'Restarting', checking: 'Making sure it stays up',
-  'rolling back': 'Putting the previous version back' };
-function fmtDay(ts) {
-  const d = new Date(ts * 1000), n = new Date();
-  const days = Math.round((new Date(d.toDateString()) - new Date(n.toDateString())) / 86400000);
-  if (days === 0) return 'today ' + fmtClock(ts);
-  if (days === 1) return 'tomorrow ' + fmtClock(ts);
-  if (days > 1 && days < 7) return d.toLocaleDateString([], { weekday: 'long' }) + ' ' + fmtClock(ts);
-  return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) + ' ' + fmtClock(ts);
-}
-function agoLong(s) {
-  if (s < 36 * 3600) return ago(s);
-  return Math.round(s / 86400) + ' days ago';
-}
-function renderMaint() {
-  const d = mData;
-  if (!d) { $('mList').innerHTML = '<div class="mrow"><span class="sub">Loading…</span></div>'; return; }
-  const scheduled = d.items.filter(i => i.schedule).length;
-  $('mCount').hidden = !scheduled; $('mCount').textContent = scheduled;
-  $('mTz').innerHTML = `Times in <b>${esc(d.timezone)}</b> · now ${esc(d.server_time)}`;
-  const q = $('mFilter').value.trim().toLowerCase();
-  const rows = d.items.filter(i => !q || (i.name + ' ' + (i.image || '') + ' ' + (i.project || '')).toLowerCase().includes(q));
-  if (!rows.length) { $('mList').innerHTML = `<div class="mrow"><span class="sub">${d.items.length ? 'No containers match.' : 'No containers found.'}</span></div>`; return; }
-  const now = Date.now() / 1000 + offset;
-  $('mList').innerHTML = rows.map(i => {
-    const st = i.status === 'running' ? 'running' : i.status === 'missing' ? 'missing' : i.controlled ? 'sleeping' : 'stopped';
-    const pillSt = i.progress ? 'maintenance' : st;
-    let sched = `<div class="sched off">Not scheduled</div>`;
-    if (i.schedule) {
-      sched = `<div class="sched">${esc(i.summary)}</div>` +
-        (i.next_run ? `<div class="sub">Next: ${esc(fmtDay(i.next_run))}${i.schedule.busy_wait ? '' : ' · restarts even if busy'}</div>` : '');
-    }
-    let last;
-    if (i.progress) {
-      const p = i.progress, pct = p.pct != null ? Math.round(p.pct) : null;
-      const bytes = p.phase === 'downloading' && p.total_bytes ? ` · ${fmtBytes(p.done_bytes || 0)} of ${fmtBytes(p.total_bytes)}` : '';
-      last = `<div class="mprog"><div class="label" style="display:flex;justify-content:space-between;gap:8px"><span class="state" style="font-weight:600;color:var(--fg)">${esc(PHASE[p.phase] || p.phase)}${bytes}</span><b>${pct != null ? pct + '%' : fmtDur(now - p.since)}</b></div>
-        <div class="bar busy ${pct == null ? 'full' : ''}"><i style="${pct != null ? `width:${pct}%` : ''}"></i></div></div>`;
-    } else if (i.queued) {
-      last = `<div class="last"><span class="res waiting">Waiting its turn</span></div>`;
-    } else if (i.waiting) {
-      last = `<div class="last"><span class="res waiting">Waiting</span><span class="msg">${esc(i.waiting.replace(/^busy: /, 'Busy: '))}. Stowaway checks again every 10 minutes.</span></div>`;
-    } else if (i.last) {
-      const L = i.last;
-      last = `<div class="last"><span class="res ${esc(L.result)}">${esc(RES[L.result] || L.result)}</span>
-        <span class="msg">${esc(L.message)}</span><span>${L.manual ? 'Run by hand ' : ''}${esc(agoLong(now - L.at))}</span>
-        ${i.bad_version && !i.progress ? `<button type="button" class="linkbtn" data-m="retry" data-n="${esc(i.name)}">Allow that version next time</button>` : ''}</div>`;
-    } else {
-      last = `<div class="last">${i.schedule ? 'Hasn\'t run yet' : ''}</div>`;
-    }
-    const busy = !!(i.progress || i.queued);
-    return `<div class="mrow ${i.schedule ? 'on' : ''}">
-      <div><div class="cname">${esc(i.name)} <span class="pill ${pillSt}">${i.progress ? 'maintenance' : st}</span></div>
-        <div class="sub">${esc(i.image || 'container not found')}${i.controlled ? ' · sleeps with Stowaway' : ''}${i.managed_by === 'truenas' ? '<span class="tag" title="Updates are left to TrueNAS">TrueNAS app</span>' : ''}</div></div>
-      <div>${sched}</div>
-      ${last}
-      <div class="actions">
-        ${i.status !== 'missing' ? `<button data-m="run" data-n="${esc(i.name)}" ${busy ? 'disabled' : ''}>Run now</button>` : ''}
-        ${i.status !== 'missing' ? `<button data-m="edit" data-n="${esc(i.name)}">${i.schedule ? 'Change' : 'Schedule'}</button>`
-                                  : `<button data-m="remove" data-n="${esc(i.name)}" class="danger" ${busy ? 'disabled' : ''}>Remove</button>`}
-      </div>
-    </div>`;
-  }).join('');
-}
-async function refreshMaint() {
-  try { mData = await api('/maintenance'); renderMaint(); } catch (e) { console.error(e); }
-}
-$('mFilter').addEventListener('input', renderMaint);
-$('mList').addEventListener('click', async (e) => {
-  const b = e.target.closest('button[data-m]');
-  if (!b) return;
-  const name = b.dataset.n, act = b.dataset.m, item = mData.items.find(i => i.name === name);
-  const path = `/maintenance/${encodeURIComponent(name)}`;
-  if (act === 'edit') return openSchedule(item);
-  if (act === 'run') {
-    const upd = item.schedule && item.schedule.update;
-    const what = item.status === 'running'
-      ? `Restart ${name} now${upd ? ', updating it first if a newer version exists' : ''}?`
-      : upd ? `${name} isn't running. Check for a newer version now and install it if there is one?`
-            : `${name} isn't running, so there's nothing to restart. Run anyway?`;
-    if (!confirm(what + (upd || item.status === 'running' ? '\n\nIt restarts right away, even if it\'s busy.' : ''))) return;
-  }
-  if (act === 'remove' && !confirm(`Forget the schedule for ${name}? The container no longer exists.`)) return;
-  b.disabled = true;
-  try {
-    if (act === 'run') await api(path + '/run', { method: 'POST' });
-    if (act === 'retry') { await api(path + '/retry-update', { method: 'POST' }); mData.items.find(x => x.name === name).bad_version = false; }
-    if (act === 'remove') await api(path, { method: 'DELETE' });
-  } catch (err) { alert(err.message); }
-  refreshMaint();
-});
-
-function mdayOptions() {
-  const sfx = (n) => (n % 100 >= 11 && n % 100 <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
-  return Array.from({ length: 28 }, (_, k) => `<option value="${k + 1}">${k + 1}${sfx(k + 1)}</option>`).join('') +
-    '<option value="last">Last day of the month</option>';
-}
-$('mForm').mday.innerHTML = mdayOptions();
-function syncSchedule() {
-  const f = $('mForm'), freq = f.freq.value, off = freq === 'off';
-  $('mWhen').hidden = off; $('mOpts').hidden = off;
-  $('mWeekday').hidden = freq !== 'weekly';
-  $('mMday').hidden = freq !== 'monthly';
-  $('mWhen').style.gridTemplateColumns = freq === 'daily' ? '1fr' : '';
-  const i = mEditing;
-  let uh = 'Downloads it first while the container keeps running, so it\'s only down for the swap. Settings, volumes and networks are kept. If the new version doesn\'t stay up, the previous version is put back.';
-  if (i && i.controlled && i.status !== 'running') uh += ' Since it\'s asleep, it\'s started to check the new version works and then put back to sleep.';
-  if (i && i.managed_by === 'truenas') uh = '<span style="color:var(--warn)">This is a TrueNAS app, so updates are left to TrueNAS (Apps page). Scheduled restarts still work.</span>';
-  $('mUpdHint').innerHTML = uh;
-  const bw = Number(f.busy_wait.value || 0);
-  $('mBusyHint').innerHTML = bw
-    ? `Busy means CPU above <b>${settingsCache.busy_cpu ?? 5}%</b> or network above <b>${settingsCache.busy_net ?? 50} KB/s</b> (Settings)${i && i.controlled ? ', or someone using it through Stowaway' : ''}. After ${bw} hour${bw === 1 ? '' : 's'} it's skipped until next time.`
-    : 'Restarts at the scheduled time even if it\'s in the middle of something.';
-  $('mNext').innerHTML = off ? (i && i.schedule ? 'Saving turns the schedule off.' : '')
-    : `Times are in <b>${esc((mData && mData.timezone) || settingsCache.timezone_effective || 'UTC')}</b>. ` +
-      (freq === 'monthly' ? 'Days 29–31 aren\'t offered since not every month has them; use <i>Last day</i> instead.' : '');
-}
-['freq', 'busy_wait'].forEach(n => $('mForm')[n].addEventListener('input', syncSchedule));
-function openSchedule(i) {
-  mEditing = i;
-  const f = $('mForm'), s = i.schedule || {};
-  $('mErr').textContent = '';
-  $('mTitle').textContent = `Scheduled restart: ${i.name}`;
-  f.freq.value = s.freq || 'weekly';
-  f.weekday.value = String(s.weekday ?? 6);
-  f.mday.value = String(s.mday ?? 1);
-  f.time.value = s.time || '04:00';
-  f.update.checked = !!s.update;
-  f.busy_wait.value = s.busy_wait ?? 6;
-  syncSchedule();
-  $('mDlg').showModal();
-}
-$('mCancel').onclick = () => $('mDlg').close();
-$('mForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const f = e.target;
-  try {
-    await api(`/maintenance/${encodeURIComponent(mEditing.name)}`, { method: 'PUT', body: JSON.stringify({
-      freq: f.freq.value, time: f.time.value, weekday: Number(f.weekday.value),
-      mday: f.mday.value === 'last' ? 'last' : Number(f.mday.value),
-      update: f.update.checked, busy_wait: Number(f.busy_wait.value || 0) }) });
-    $('mDlg').close();
-    refreshMaint();
-  } catch (err) { $('mErr').textContent = err.message; }
-});
-
 /* ---------- diagnostics ---------- */
 let diag = null;
 function renderDiag() {
@@ -1668,97 +2043,112 @@ $('diagIssue').onclick = () => {
   const body = ['**What happened?**', '', '', '**What did you expect to happen?**', '', '',
     '**Steps to make it happen again**', '1. ', '', '---',
     `${diag.summary}`, '',
-    '_Please attach the diagnostic report: Settings → Diagnostics → Download report. Look it over first; it lists your containers and home-network addresses._'].join('\n');
+    '_Please attach the diagnostic report: System Settings → Diagnostics → Download report. Look it over first; it lists your containers and home-network addresses._'].join('\n');
   const q = new URLSearchParams({ title: '', body });
   window.open(`${diag.issue_url}?${q}`, '_blank', 'noopener');
 };
 
-/* ---------- integrations ---------- */
-let intTab = 'homarr', intItems = [];
+$('homarrTest').onclick = async () => {
+  const f = $('setForm'), msg = $('homarrMsg');
+  msg.textContent = 'Checking…';
+  try {
+    const r = await api('/homarr/test', { method: 'POST', body: JSON.stringify({ url: f.homarr_url.value.trim(), key: f.homarr_key.value.trim() }) });
+    msg.textContent = r.message + (f.homarr_key.value.trim() || f.homarr_url.value.trim() !== (settingsCache.homarr_url || '') ? ' Click Save to keep it.' : '');
+  } catch (e) { msg.textContent = e.message; }
+};
+/* ---------- dashboards tab ---------- */
+let dashApps = {}, intTab = 'homarr';
 const BASE = location.origin + location.pathname.replace(/\/$/, '');
+async function loadDashApps() { try { dashApps = await api('/dash-apps'); } catch {} }
 function codeBlock(code, label) {
   return `<div class="snipbar"><span class="hint" style="margin:0">${label || ''}</span><button type="button" class="copy" data-copy="${esc(code)}">Copy</button></div><pre class="snip">${esc(code)}</pre>`;
 }
-function intItem() { return intItems.find(i => i.name === $('intApp').value) || intItems[0]; }
 function yamlKey(n) { return /^[A-Za-z0-9_-]+$/.test(n) ? n : JSON.stringify(n); }
 const DASH_MATCH = { homarr: /homarr/, homepage: /gethomepage|homepage/, dashy: /dashy/, glance: /glance/,
   heimdall: /heimdall/, ha: /home-?assistant|hass/ };
-function dashOnMacvlan(tab) {
-  const re = DASH_MATCH[tab];
+function dashOnMacvlan(kind) {
+  const re = DASH_MATCH[kind];
   return re && containers.find(c => c.macvlan_ip && (re.test(c.name.toLowerCase()) || re.test((c.image || '').toLowerCase())));
 }
-const SETUP_KINDS = ['homarr', 'homepage', 'glance'];
-let intSB = '';
-function intTabName() { return { homarr: 'Homarr', homepage: 'Homepage', glance: 'Glance' }[intTab] || intTab; }
-function setupApps() { return intItems.filter(i => i.controlled && i.link); }
-function pickedApps() {
-  return [...document.querySelectorAll('#dashSetup input[data-pick]:checked')]
-    .map(cb => setupApps().find(i => i.name === cb.dataset.pick)).filter(Boolean).map(i => ({ name: i.name, link: i.link }));
+function sbFor(kind) {
+  // A dashboard on a macvlan network can't reach the server's own address, only the helper's.
+  const shimIp = settingsCache.macvlan_shim_ip;
+  return dashOnMacvlan(kind) && shimIp ? BASE.replace(location.hostname, shimIp) : BASE;
 }
-function homarrWidgetHtml(i) {
-  return `<h3 style="margin-top:6px">Status widget</h3>
-    <p class="hint" style="margin:0">Shows <b>In Use</b>, <b>Sleeping in 8 min</b>, <b>Ready to Sleep</b> or <b>Sleeping</b> for an app, in colour (<i>Waking up</i>, <i>Going to sleep</i>, <i>Updating</i> or <i>Kept awake</i> in between). Needs a Homarr version that has <b>Manage → Custom widgets</b>.</p>
-    <ol class="steps" style="margin:0">
-      <li>Once: <a class="btn" href="${API}/homarr/widget?base=${encodeURIComponent(intSB)}" download="stowaway-status-widget.json">Download the widget</a>, then in Homarr go to <b>Manage → Custom widgets → Import</b> and choose the file.</li>
-      <li>Edit a board, add the <b>Stowaway status</b> widget, and in its settings set <b>App name</b> to <code>${esc(i ? i.name : 'your app')}</code>. Add one widget per app.</li>
-    </ol>`;
+function dashItem() { return editing ? { name: editing.name, link: linksFor(editing)[0] || null } : null; }
+const DTILE = { homarr: ['#c2410c', 'H'], heimdall: ['#475569', 'H'], homepage: ['#0e7490', 'H'], glance: ['#4d7c0f', 'G'], dashy: ['#7c3aed', 'D'] };
+function drow(kind, title, state, btns) {
+  const [bg, l] = DTILE[kind];
+  return `<div class="drow" data-k="${kind}"><span class="dtile" style="background:${bg}" aria-hidden="true">${l}</span>
+    <div class="dinfo"><b>${title}</b><span class="dstate" data-state>${state}</span></div><div class="dbtns" data-btns>${btns || ''}</div></div>`;
 }
-async function loadHomarrSetup() {
-  const box = $('dashSetup'), i = intItem();
-  let h = '<h3>Add to Homarr</h3>';
-  if (!i || !i.controlled || !i.link) {
-    box.innerHTML = h + `<span class="hint">${i && i.controlled ? `${esc(i.name)} has no link to open it with. Give it a link port (Edit) first.` : 'Pick an app Stowaway puts to sleep.'}</span>`;
+function setRow(kind, state, btns, on) {
+  const r = document.querySelector(`#dashList .drow[data-k="${kind}"]`);
+  if (!r) return;
+  const st = r.querySelector('[data-state]');
+  st.innerHTML = state; st.classList.toggle('on', !!on);
+  r.querySelector('[data-btns]').innerHTML = btns || '';
+}
+function renderDashTab() {
+  const i = dashItem();
+  if (!i) return;
+  $('dashMsg').innerHTML = '';
+  $('dashIntro').innerHTML = `Show ${esc(i.name)}'s status (<b>In Use</b>, <b>Sleeping in 8 min</b>, <b>Ready to Sleep</b>, <b>Sleeping</b>) on your dashboard. Checking the status never wakes it.`;
+  const mv = ['homarr', 'homepage', 'glance', 'heimdall', 'dashy'].map(dashOnMacvlan).filter(Boolean);
+  $('dashMv').innerHTML = mv.length ? (settingsCache.macvlan_shim_ip
+    ? `<p class="hint" style="margin:0">${mv.map(c => `<b>${esc(c.name)}</b>`).join(', ')} ${mv.length > 1 ? 'are' : 'is'} on a macvlan network, so ${mv.length > 1 ? 'they check' : 'it checks'} Stowaway through the helper address <b>${esc(settingsCache.macvlan_shim_ip)}</b>. That's set up for you.</p>`
+    : `<div class="warn" style="margin:0">${mv.map(c => `<b>${esc(c.name)}</b>`).join(', ')} ${mv.length > 1 ? 'are' : 'is'} on a macvlan network and can't reach this server at its usual address. Set a <b>Macvlan helper IP</b> in System Settings → Network first.</div>`) : '';
+  const st = `${BASE}/status/${encodeURIComponent(i.name)}`;
+  $('statusAddrs').innerHTML = [['Status (JSON)', st], ['For a status dot · 200 while awake, 503 while asleep', `${st}?code=1`]].map(([l, u]) =>
+    `<div class="addr"><span class="hint" style="margin:0">${l}</span><div class="line"><input readonly value="${esc(u)}" aria-label="${esc(l)}"><button type="button" data-copy="${esc(u)}">Copy</button></div></div>`).join('');
+  if (!i.link) {
+    $('dashList').innerHTML = `<div class="drow"><span class="hint" style="margin:0">${esc(i.name)} has no link to open it with. Give it a link port (Address &amp; opening) first.</span></div>`;
+    renderManual();
     return;
   }
+  const looking = 'Looking…';
+  $('dashList').innerHTML = drow('homarr', 'Homarr', looking) + drow('heimdall', 'Heimdall', looking) +
+    drow('homepage', 'Homepage', looking) + drow('glance', 'Glance', looking) +
+    drow('dashy', 'Dashy and others', 'Set up by hand with the status address below', '<button type="button" data-d="manual">Show the steps</button>');
+  loadHomarrRow(i); loadHeimdallRow(i); loadFileRow('homepage', i); loadFileRow('glance', i);
+  renderManual();
+}
+async function loadHomarrRow(i) {
+  const widget = `<a class="btn" href="${API}/homarr/widget?base=${encodeURIComponent(sbFor('homarr'))}" download="stowaway-status-widget.json" title="Import once in Homarr: Manage → Custom widgets → Import">Download widget</a>`;
   let r;
   try { r = await api(`/homarr/app/${encodeURIComponent(i.name)}?link=${encodeURIComponent(i.link)}`); }
-  catch (e) { box.innerHTML = h + `<span class="hint">${esc(e.message)}</span>`; return; }
-  if (!$('dashSetup') || intTab !== 'homarr' || intItem() !== i) return;
-  if (!r.configured) {
-    box.innerHTML = h + `<p class="hint" style="margin:0">Enter Homarr's address and an API key in Settings once; then each app can be added to Homarr from here with one click.</p>
-      <div><button type="button" id="hoSettings">Open Settings</button></div>` + homarrWidgetHtml(i);
-    return;
-  }
+  catch (e) { return setRow('homarr', esc(e.message), widget); }
+  if (!dashItem() || dashItem().name !== i.name) return;
+  if (!r.configured) return setRow('homarr', 'Not connected. Enter Homarr\'s address and API key in System Settings once.',
+    `${widget}<button type="button" class="primary" data-d="homarr-connect">Connect Homarr</button>`);
   const m = r.match;
-  h += m
-    ? `<p class="hint" style="margin:0">Homarr already has <b>${esc(m.name)}</b>${m.href ? ` (${esc(m.href)})` : ''}. This keeps its name and icon, points it at ${esc(i.name)}'s Stowaway link and sets its Ping URL, so the dot shows whether it's awake.</p>`
-    : `<p class="hint" style="margin:0">Adds ${esc(i.name)} to Homarr's apps with its Stowaway link and a Ping URL, so the dot shows whether it's awake. Then place it on a board with an App widget.</p>`;
-  h += `<div><button type="button" class="primary" id="hoAdd">${m ? `Update ${esc(i.name)} in Homarr` : `Add ${esc(i.name)} to Homarr`}</button></div>
-    <div id="dsMsg" class="hint" style="margin:0"></div>` + homarrWidgetHtml(i);
-  box.innerHTML = h;
+  setRow('homarr', m ? `On your Homarr as “${esc(m.name)}”${m.pingUrl ? ', with its status dot' : ''}` : 'Not added yet',
+    `${widget}<button type="button" class="${m ? '' : 'primary'}" data-d="homarr">${m ? 'Update in Homarr' : 'Add to Homarr'}</button>`, !!m);
 }
-async function loadDashSetup(kind) {
-  if (kind === 'homarr') return loadHomarrSetup();
-  const box = $('dashSetup');
+async function loadHeimdallRow(i) {
   let r;
-  try { r = await api('/dash/' + kind); } catch (e) { box.innerHTML = `<h3>Set it up for me</h3><span class="hint">${esc(e.message)}</span>`; return; }
-  if (!$('dashSetup') || intTab !== kind) return;
-  const name = intTabName(), apps = setupApps();
-  let h = '<h3>Set it up for me</h3>';
-  if (!apps.length) { box.innerHTML = h + `<span class="hint">${intItems.some(i => i.controlled) ? 'None of your apps has a link to open it with. Give one a link port (Edit) first.' : 'Enable Stowaway on an app first.'}</span>`; return; }
+  try { r = await api('/heimdall'); } catch (e) { return setRow('heimdall', esc(e.message)); }
+  if (!dashItem() || dashItem().name !== i.name) return;
   const running = r.containers.filter(c => c.running);
-  if (!running.length) {
-    box.innerHTML = h + `<span class="hint">${r.containers.length ? `Start ${esc(r.containers[0].name)} first.` : `No running ${name} container found on this server.`} You can still set it up by hand below.</span>`;
-    return;
-  }
-  const what = { homepage: 'Adds a group with these apps to Homepage\'s services.yaml. Only that group is written; the rest of the file stays as it is, and the first time, your original is saved next to it.',
-    glance: 'Writes a stowaway.yml file next to glance.yml with a status monitor for these apps and a list of all apps. You add it to a page with one line.' }[kind];
-  h += `<p class="hint" style="margin:0">${what} Nothing changes until you click the button; click it again after enabling more apps.</p>`;
-  h += `<div style="display:flex;flex-wrap:wrap;gap:6px 14px">${apps.map(i =>
-    `<label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" data-pick="${esc(i.name)}" checked> ${esc(i.name)}</label>`).join('')}</div>`;
-  if (running.length > 1)
-    h += `<label>${name} container <select id="dsCont">${running.map(c => `<option>${esc(c.name)}</option>`).join('')}</select></label>`;
-  else h += `<input type="hidden" id="dsCont" value="${esc(running[0].name)}">`;
-  if (kind === 'homepage') {
-    h += `<label>Group name <input id="dsGroup" value="Stowaway" maxlength="60"></label>
-      <p class="hint" style="margin:0">If these apps already have tiles elsewhere in services.yaml, they'll show twice; remove the old ones.</p>
-      <div><button type="button" class="primary" id="dsGo">Write to services.yaml</button></div>`;
-  } else if (kind === 'glance') {
-    h += `<label>Monitor title <input id="dsTitle" value="Apps" maxlength="60"></label>
-      <div><button type="button" class="primary" id="dsGo">Write stowaway.yml</button></div>`;
-  }
-  h += `<div id="dsMsg" class="hint" style="margin:0"></div>`;
-  box.innerHTML = h;
+  if (!r.containers.length) return setRow('heimdall', 'No Heimdall container found on this server.');
+  if (!running.length) return setRow('heimdall', `Start ${esc(r.containers[0].name)} first.`);
+  const on = (dashApps.heimdall || []).includes(i.name);
+  const pick = running.length > 1 ? `<select data-cont aria-label="Heimdall container">${running.map(c => `<option>${esc(c.name)}</option>`).join('')}</select>` : `<input type="hidden" data-cont value="${esc(running[0].name)}">`;
+  setRow('heimdall', on ? 'Tile added: it shows the status, with the app\'s own icon' : 'Not added yet. Adds a tile with its own icon and status.',
+    `${pick}<button type="button" class="${on ? '' : 'primary'}" data-d="heimdall">${on ? 'Update tile' : 'Add to Heimdall'}</button>`, on);
+}
+async function loadFileRow(kind, i) {
+  let r;
+  try { r = await api('/dash/' + kind); } catch (e) { return setRow(kind, esc(e.message)); }
+  if (!dashItem() || dashItem().name !== i.name) return;
+  const name = kind === 'homepage' ? 'Homepage' : 'Glance', running = r.containers.filter(c => c.running);
+  if (!r.containers.length) return setRow(kind, `No ${name} container found on this server.`);
+  if (!running.length) return setRow(kind, `Start ${esc(r.containers[0].name)} first.`);
+  const on = (dashApps[kind] || []).includes(i.name);
+  const pick = running.length > 1 ? `<select data-cont aria-label="${name} container">${running.map(c => `<option>${esc(c.name)}</option>`).join('')}</select>` : `<input type="hidden" data-cont value="${esc(running[0].name)}">`;
+  const what = kind === 'homepage' ? 'in the Stowaway group of services.yaml' : 'in stowaway.yml';
+  setRow(kind, on ? `Added ${what}` : `Not added yet. Writes it ${what}; nothing else changes.`,
+    `${pick}<button type="button" class="${on ? '' : 'primary'}" data-d="${kind}">${on ? `Update ${name}` : `Add to ${name}`}</button>`, on);
 }
 function glanceIncludeHelp() {
   return codeBlock(`pages:
@@ -1768,119 +2158,57 @@ function glanceIncludeHelp() {
         widgets:
           - $include: stowaway.yml`, 'Add the <code>$include</code> line to the <code>widgets:</code> of any column in <code>glance.yml</code> (keep its indentation):');
 }
-$('intBody').addEventListener('click', async (e) => {
-  if (e.target.closest('#hoSettings')) { $('intDlg').close(); return $('settingsBtn').click(); }
-  const ho = e.target.closest('#hoAdd');
-  if (ho) {
-    const i = intItem(), msg = $('dsMsg');
-    ho.disabled = true; msg.textContent = 'Working…';
-    try {
-      const r = await api('/homarr/add', { method: 'POST', body: JSON.stringify({ name: i.name, link: i.link, base: intSB }) });
+$('dashList').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-d]');
+  if (!b) return;
+  const i = dashItem(), kind = b.dataset.d, row = b.closest('.drow'), msg = $('dashMsg');
+  if (kind === 'manual') { $('dashManual').open = true; showIntTab('dashy'); $('dashManual').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+  if (kind === 'homarr-connect') { $('dlg').close(); return openSettings('dash'); }
+  const cont = row && row.querySelector('[data-cont]') ? row.querySelector('[data-cont]').value : null;
+  b.disabled = true; msg.textContent = kind === 'heimdall' ? 'Working… (the first time also adds the Stowaway tile type to Heimdall)' : 'Working…';
+  try {
+    let r;
+    if (kind === 'homarr') {
+      r = await api('/homarr/add', { method: 'POST', body: JSON.stringify({ name: i.name, link: i.link, base: sbFor('homarr') }) });
       msg.innerHTML = `<b>${esc(r.message)}</b> The dot updates within a minute.`;
-      ho.textContent = `Update ${i.name} in Homarr`;
-    } catch (err) { msg.textContent = err.message; }
-    ho.disabled = false;
-    return;
-  }
-  const t = e.target.closest('#dsGo');
-  if (!t) return;
-  const msg = $('dsMsg'), kind = intTab;
-  const apps = pickedApps();
-  if (!apps.length) { msg.textContent = 'Pick at least one app.'; return; }
-  t.disabled = true; msg.textContent = 'Working…';
-  try {
-    if (t.id === 'dsGo' && kind === 'homepage') {
-      const r = await api('/dash/homepage', { method: 'POST', body: JSON.stringify({ container: $('dsCont').value, base: intSB, group: $('dsGroup').value, apps }) });
-      msg.innerHTML = `<b>${esc(r.message)}</b> Reload Homepage to see it.`;
-    } else if (t.id === 'dsGo' && kind === 'glance') {
-      const r = await api('/dash/glance', { method: 'POST', body: JSON.stringify({ container: $('dsCont').value, base: intSB, title: $('dsTitle').value, apps }) });
-      msg.innerHTML = `<b>${esc(r.message)}</b>` + (r.included ? '' : glanceIncludeHelp());
+    } else if (kind === 'heimdall') {
+      r = await api('/heimdall/tile', { method: 'POST', body: JSON.stringify({ container: cont, name: i.name, link: i.link, base: sbFor('heimdall') }) });
+      msg.innerHTML = `<b>${esc(r.message)}</b> Reload Heimdall to see it.`;
+    } else {
+      // Homepage and Glance get one block with every app added from here, so keep the others.
+      const names = new Set((dashApps[kind] || []).filter(n => services.some(s => s.name === n && linksFor(s)[0])));
+      names.add(i.name);
+      const apps = [...names].map(n => ({ name: n, link: linksFor(services.find(s => s.name === n))[0] }));
+      if (kind === 'homepage') {
+        r = await api('/dash/homepage', { method: 'POST', body: JSON.stringify({ container: cont, base: sbFor('homepage'), group: 'Stowaway', apps }) });
+        msg.innerHTML = `<b>${esc(r.message)}</b> Reload Homepage to see it.`;
+      } else {
+        r = await api('/dash/glance', { method: 'POST', body: JSON.stringify({ container: cont, base: sbFor('glance'), title: 'Apps', apps }) });
+        msg.innerHTML = `<b>${esc(r.message)}</b>` + (r.included ? '' : glanceIncludeHelp());
+      }
     }
-  } catch (err) { msg.textContent = err.message; }
-  t.disabled = false;
+    await loadDashApps();
+    renderNotes();
+    if (kind === 'homarr') loadHomarrRow(i); else if (kind === 'heimdall') loadHeimdallRow(i); else loadFileRow(kind, i);
+  } catch (err) { msg.textContent = err.message; b.disabled = false; }
 });
-$('homarrTest').onclick = async () => {
-  const f = $('setForm'), msg = $('homarrMsg');
-  msg.textContent = 'Checking…';
-  try {
-    const r = await api('/homarr/test', { method: 'POST', body: JSON.stringify({ url: f.homarr_url.value.trim(), key: f.homarr_key.value.trim() }) });
-    msg.textContent = r.message + (f.homarr_key.value.trim() || f.homarr_url.value.trim() !== (settingsCache.homarr_url || '') ? ' Click Save to keep it.' : '');
-  } catch (e) { msg.textContent = e.message; }
-};
-async function loadHeimdallTile(r) {
-  const box = $('hmTile'), i = intItem();
-  if (!box) return;
-  let h = '<h3>Add to Heimdall</h3>';
-  if (!i || !i.controlled || !i.link) {
-    box.innerHTML = h + `<span class="hint">${i && i.controlled ? `${esc(i.name)} has no link to open it with. Give it a link port (Edit) first.` : 'Pick an app Stowaway puts to sleep.'}</span>`;
-    return;
-  }
-  const running = r.containers.filter(c => c.running);
-  if (!running.length) {
-    box.innerHTML = h + `<span class="hint">${r.containers.length ? `Start ${esc(r.containers[0].name)} first.` : 'No running Heimdall container found on this server.'} You can still set it up by hand below.</span>`;
-    return;
-  }
-  h += `<p class="hint" style="margin:0">Creates a tile for ${esc(i.name)} with its own icon and Awake/Asleep status, opening it through Stowaway. If Heimdall already has a ${esc(i.name)} tile, that one is changed instead and keeps its title and icon.</p>`;
-  if (running.length > 1) h += `<label>Heimdall container <select id="hmCont">${running.map(c => `<option>${esc(c.name)}</option>`).join('')}</select></label>`;
-  else h += `<input type="hidden" id="hmCont" value="${esc(running[0].name)}">`;
-  h += `<div><button type="button" class="primary" id="hmAdd">Add ${esc(i.name)} to Heimdall</button></div><div id="hmMsg" class="hint" style="margin:0"></div>`;
-  box.innerHTML = h;
-}
-$('intBody').addEventListener('click', async (e) => {
-  const b = e.target.closest('#hmAdd');
-  if (!b) return;
-  const i = intItem(), msg = $('hmMsg');
-  b.disabled = true; msg.textContent = 'Working… (the first time also adds the Stowaway tile type to Heimdall)';
-  try {
-    const r = await api('/heimdall/tile', { method: 'POST', body: JSON.stringify({ container: $('hmCont').value, name: i.name, link: i.link, base: intSB }) });
-    msg.innerHTML = `<b>${esc(r.message)}</b> Reload Heimdall to see it.`;
-  } catch (err) { msg.textContent = err.message; }
-  b.disabled = false;
-});
-async function loadHeimdall() {
-  const box = $('hmInstall');
-  if (!box) return;
-  let r;
-  try { r = await api('/heimdall'); } catch (e) { box.innerHTML = `<span class="hint">${esc(e.message)}</span>`; return; }
-  if (!$('hmInstall')) return;
-  loadHeimdallTile(r);
-  const manual = 'see <code>heimdall/README.md</code> in the Stowaway project to add it by hand';
-  if (!r.containers.length) { box.innerHTML = `<span class="hint">No Heimdall container found on this server; ${manual}.</span>`; return; }
-  box.innerHTML = r.containers.map(c => `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button type="button" data-hm="${esc(c.name)}" ${c.running ? '' : 'disabled'}>Add the Stowaway tile to ${esc(c.name)}</button>
-      <span class="hint" data-hm-msg="${esc(c.name)}">${c.running ? '' : 'Start it first.'}</span></div>`).join('');
-}
-$('intBody').addEventListener('click', async (e) => {
-  const b = e.target.closest('button[data-hm]');
-  if (!b) return;
-  const name = b.dataset.hm, msg = document.querySelector(`[data-hm-msg="${CSS.escape(name)}"]`);
-  b.disabled = true; msg.textContent = 'Adding…';
-  try {
-    const r = await api('/heimdall/install', { method: 'POST', body: JSON.stringify({ container: name }) });
-    msg.innerHTML = `<b>${esc(r.message)}</b> Reload Heimdall in your browser.`;
-    b.textContent = 'Add again (update)';
-  } catch (err) { msg.textContent = err.message; }
-  b.disabled = false;
-});
-function renderInt() {
+
+/* set it up by hand */
+function showIntTab(t) { intTab = t; renderManual(); }
+$('intTabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-t]'); if (b) showIntTab(b.dataset.t); });
+function renderManual() {
   document.querySelectorAll('#intTabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.t === intTab)));
-  $('tokSection').hidden = intTab !== 'ha';
-  const i = intItem();
-  if (!i) { $('intBody').innerHTML = '<div class="empty">Enable Stowaway on an app, or give a container a restart schedule, first.</div>'; return; }
-  // A dashboard on a macvlan network can't reach the server's own address, only the helper's.
-  const dashC = dashOnMacvlan(intTab), shimIp = settingsCache.macvlan_shim_ip;
-  const SB = dashC && shimIp ? BASE.replace(location.hostname, shimIp) : BASE;
-  intSB = SB;
-  const n = i.name, st = `${SB}/status/${encodeURIComponent(n)}`, dot = `${st}?code=1`;
-  const link = i.link || `http://${host}`, wake = `${SB}/wake/${encodeURIComponent(n)}`, api = `${SB}/api/v1/apps/${encodeURIComponent(n)}`;
-  const slug = n.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  const i = dashItem();
+  if (!i) return;
+  const SB = sbFor(intTab), n = i.name, st = `${SB}/status/${encodeURIComponent(n)}`, dot = `${st}?code=1`;
+  const link = i.link || `http://${host}`, apiUrl = `${SB}/api/v1/apps/${encodeURIComponent(n)}`;
   let h = '';
   if (intTab === 'homarr') {
     h = `<ol class="steps">
-      <li>Edit the <b>${esc(n)}</b> app in Homarr. Set <b>URL</b> to <code>${esc(link)}</code> and <b>Ping URL</b> to <code>${esc(dot)}</code>.<br><span class="hint">The dot is <b>green while awake</b> and <b>red while asleep</b>. Red here means asleep, not broken. Homarr checks every minute, and this never wakes the app. Don't leave Ping URL empty: Homarr would then check the app's own link, which wakes it every minute and keeps it awake.</span></li>
-      <li>For the status in words (In Use, Sleeping in 8 min, Ready to Sleep, Sleeping), use the <b>Status widget</b> above.</li></ol>`;
+      <li>Edit the <b>${esc(n)}</b> app in Homarr. Set <b>URL</b> to <code>${esc(link)}</code> and <b>Ping URL</b> to <code>${esc(dot)}</code>.<br><span class="hint">The dot is <b>green while awake</b> and <b>red while asleep</b>. Red here means asleep, not broken. Don't leave Ping URL empty: Homarr would then check the app's own link, which wakes it every minute.</span></li>
+      <li>For the status in words, download the widget (Homarr row above), import it in Homarr under <b>Manage → Custom widgets → Import</b>, add the <b>Stowaway status</b> widget to a board and set its <b>App name</b> to <code>${esc(n)}</code>.</li></ol>`;
   } else if (intTab === 'homepage') {
-    const code = `- ${yamlKey(n)}:
+    h = codeBlock(`- ${yamlKey(n)}:
     href: ${link}
     siteMonitor: ${dot}
     description: Managed by Stowaway
@@ -1890,17 +2218,15 @@ function renderInt() {
       refreshInterval: 15000
       mappings:
         - field: indicator
-          label: Status`;
-    h = codeBlock(code, `Add to <code>services.yaml</code> under a group. The monitor shows a red mark while ${esc(n)} is asleep.`);
+          label: Status`, `Add to <code>services.yaml</code> under a group. The monitor shows a red mark while ${esc(n)} is asleep.`);
   } else if (intTab === 'dashy') {
-    const code = `- title: ${n}
+    h = codeBlock(`- title: ${n}
   url: ${link}
   statusCheck: true
   statusCheckUrl: ${dot}
-  statusCheckInterval: 60`;
-    h = codeBlock(code, 'Add to the items of a section in <code>conf.yml</code>. Green while awake, red while asleep.');
+  statusCheckInterval: 60`, 'Add to the items of a section in <code>conf.yml</code>. Green while awake, red while asleep.');
   } else if (intTab === 'glance') {
-    const code = `- type: monitor
+    h = codeBlock(`- type: monitor
   title: Apps
   sites:
     - title: ${n}
@@ -1922,102 +2248,97 @@ function renderInt() {
         {{ else if eq (.String "indicator_color") "red" }}<span style="color: hsl(0, 94%, 65%); font-weight: 600">{{ .String "indicator" }}</span>
         {{ else }}<span class="color-subdue">{{ .String "indicator" }}</span>{{ end }}</li>
     {{ end }}
-    </ul>`;
-    h = codeBlock(code, 'Add to a column in <code>glance.yml</code>. The second widget lists every app with its status (In Use, Sleeping in 8 min, Ready to Sleep, Sleeping…), in colour.');
+    </ul>`, 'Add to a column in <code>glance.yml</code>. The second widget lists every app with its status, in colour.');
   } else if (intTab === 'heimdall') {
-    h = `<div class="section" id="hmTile" style="border-top:0;padding-top:0"><h3>Add to Heimdall</h3><span class="hint">Looking for Heimdall…</span></div>
-      <div class="section"><h3>Or by hand</h3><ol class="steps">
-      <li>Heimdall has no status dot for ordinary tiles; the <b>Stowaway</b> tile type shows "Awake/Asleep" and the next restart instead. Add it to Heimdall (once; it stays through Heimdall updates):
-        <div id="hmInstall" style="margin-top:6px"><span class="hint">Looking for Heimdall…</span></div></li>
-      <li>In Heimdall, add or edit the tile: choose <b>Stowaway</b> as the application type, then set <b>Title</b> to <code>${esc(n)}</code> (otherwise it's called "Stowaway") and <b>URL</b> to <code>${esc(link)}</code>.</li>
-      <li>Under <b>Config</b>, switch <b>Enable</b> on (without it the tile shows no status), enter <code>${esc(SB.replace(/\/_stowaway$/, ''))}</code> as the URL and <code>${esc(n)}</code> as the App name, and click <b>Test</b>. Save.</li>
-      <li>The tile shows the Stowaway icon. To use the app's own icon instead, upload it in the tile's icon field.</li></ol></div>`;
-  } else if (intTab === 'ha') {
-    const code = `# configuration.yaml: replace YOUR_TOKEN with a token from below
+    h = `<ol class="steps">
+      <li>Add the <b>Stowaway</b> tile type to Heimdall (the <b>Add to Heimdall</b> button above does this for you), or see <code>heimdall/README.md</code> in the Stowaway project.</li>
+      <li>In Heimdall, add or edit the tile: choose <b>Stowaway</b> as the application type, set <b>Title</b> to <code>${esc(n)}</code> and <b>URL</b> to <code>${esc(link)}</code>.</li>
+      <li>Under <b>Config</b>, switch <b>Enable</b> on, enter <code>${esc(SB.replace(/\/_stowaway$/, ''))}</code> as the URL and <code>${esc(n)}</code> as the App name, and click <b>Test</b>. Save.</li></ol>`;
+  } else {
+    h = `<div class="steps" style="list-style:none;padding:0">
+      <div><b>All apps (JSON)</b><br><code>${esc(BASE)}/status</code></div>
+      <div><b>Open / wake</b><br><code>${esc(link)}</code></div>
+      <div><b>API</b> · with a token (System Settings → Home Assistant): <code>GET ${esc(apiUrl)}</code>, <code>POST …/wake</code>, <code>…/sleep</code> <code>{"block": true}</code>, <code>…/block</code> <code>{"on": true}</code>, <code>…/keep-awake</code> <code>{"minutes": 60}</code>, <code>…/restart</code></div></div>`;
+  }
+  $('intBody').innerHTML = h;
+}
+
+/* ---------- Home Assistant tab ---------- */
+function renderHaTab() {
+  const s = editing;
+  if (!s) return;
+  $('haIntro').innerHTML = `With the <b>Stowaway</b> integration (from HACS), Home Assistant gets these for ${esc(s.name)}. Use them in automations, for example put apps to sleep while nobody's home.`;
+  const tmp = document.createElement('span'); tmp.innerHTML = stateLabel(s);
+  const m = s.maintenance || {};
+  const ents = [
+    ['Awake', 'switch: wakes it or puts it to sleep', s.status === 'running' ? 'On' : 'Off'],
+    ['Don\'t wake', 'switch: stops its link from waking it', s.block_wake ? 'On' : 'Off'],
+    ['Status', 'sensor', tmp.textContent],
+    ['Sleeps at', 'sensor', s.sleeps_at ? fmtWhen(s.sleeps_at) : 'unknown'],
+    ['Next restart', 'sensor', m.next_restart_text || 'none'],
+    ['Maintenance running', 'binary sensor', m.running ? 'On' : 'Off'],
+    ['Update ready', 'binary sensor', s.updates && s.updates.available ? 'On' : 'Off'],
+    ['Restart now · Keep awake 1 hour', 'buttons', ''],
+  ];
+  $('haList').className = 'dlist ents';
+  $('haList').innerHTML = ents.map(([n, k, v]) => `<div class="drow"><div class="dinfo"><b>${esc(n)}</b><small>${esc(k)}</small></div><span>${esc(v)}</span></div>`).join('');
+  const slug = s.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  const SB = sbFor('ha'), apiUrl = `${SB}/api/v1/apps/${encodeURIComponent(s.name)}`;
+  $('haRest').innerHTML = codeBlock(`# configuration.yaml: replace YOUR_TOKEN with a token from System Settings → Home Assistant
 rest:
-  - resource: ${api}
+  - resource: ${apiUrl}
     headers:
       Authorization: Bearer YOUR_TOKEN
     scan_interval: 30
     sensor:
-      - name: ${n} status
+      - name: ${s.name} status
         value_template: "{{ value_json.summary }}"
         json_attributes: [state, wake_blocked, sleeps_at, maintenance]
 
 switch:
   - platform: rest
-    name: ${n} awake
-    resource: ${api}/power
-    state_resource: ${api}
+    name: ${s.name} awake
+    resource: ${apiUrl}/power
+    state_resource: ${apiUrl}
     body_on: '{"on": true}'
     body_off: '{"on": false}'
     is_on_template: "{{ value_json.state in ['running', 'starting'] }}"
     headers:
       Authorization: Bearer YOUR_TOKEN
       Content-Type: application/json
-  - platform: rest
-    name: ${n} don't wake
-    resource: ${api}/block
-    state_resource: ${api}
-    body_on: '{"on": true}'
-    body_off: '{"on": false}'
-    is_on_template: "{{ value_json.wake_blocked }}"
-    headers:
-      Authorization: Bearer YOUR_TOKEN
-      Content-Type: application/json
 
 rest_command:
   ${slug}_away:
-    url: ${api}/sleep
+    url: ${apiUrl}/sleep
     method: post
     headers:
       Authorization: Bearer YOUR_TOKEN
     content_type: application/json
-    payload: '{"block": true}'
-
-# automations.yaml: switch off while nobody's home, back on when someone arrives
-- alias: ${n} off while away
-  triggers:
-    - trigger: numeric_state
-      entity_id: zone.home
-      below: 1
-      for: "00:15:00"
-  actions:
-    - action: rest_command.${slug}_away
-- alias: ${n} back on when home
-  triggers:
-    - trigger: numeric_state
-      entity_id: zone.home
-      above: 0
-  actions:
-    - action: switch.turn_off
-      target:
-        entity_id: switch.${slug}_don_t_wake`;
-    h = `<p class="hint" style="margin:0"><b>Easiest:</b> install the <b>Stowaway</b> integration from HACS, enter <code>${esc(location.host)}</code> and a token from below, and every app gets switches, sensors and buttons. <b>Without HACS</b>, paste this instead.</p>` +
-        (i.controlled ? codeBlock(code, `REST setup for ${esc(n)}. Leave out <code>{"block": true}</code> if visitors should still be able to wake it while you're away.`)
-                      : `<p class="hint" style="margin:0">${esc(n)} only has a restart schedule. Its status is at <code>${esc(api)}</code>, and <code>POST ${esc(api)}/restart</code> restarts it now.</p>`);
-  } else {
-    h = `<div class="steps" style="list-style:none;padding:0">
-      <div><b>Status (JSON)</b> · never wakes the app<br><code>${esc(st)}</code></div>
-      <div><b>Status for a dot</b> · 200 while awake, 503 while asleep<br><code>${esc(dot)}</code></div>
-      <div><b>All apps (JSON)</b><br><code>${esc(BASE)}/status</code></div>
-      <div><b>Open / wake</b><br><code>${esc(link)}</code></div>
-      <div><b>API</b> · with a token: <code>GET ${esc(api)}</code>, <code>POST …/wake</code>, <code>…/sleep</code> <code>{"block": true}</code>, <code>…/block</code> <code>{"on": true}</code>, <code>…/keep-awake</code> <code>{"minutes": 60}</code>, <code>…/restart</code></div></div>`;
-  }
-  if (SETUP_KINDS.includes(intTab)) {
-    h = `<div class="section" id="dashSetup" style="border-top:0;padding-top:0"><h3>${intTab === 'homarr' ? 'Add to Homarr' : 'Set it up for me'}</h3><span class="hint">Looking for ${esc(intTabName())}…</span></div>
-      <div class="section"><h3>Or by hand</h3>${h}</div>`;
-  }
-  if (dashC) {
-    const who = esc(dashC.name);
-    h = (shimIp
-      ? `<p class="hint" style="margin:0"><b>${who}</b> is on a macvlan network (${esc(dashC.macvlan_ip)}), so it can't reach this server at its usual address. The addresses it checks below use the macvlan helper <b>${esc(shimIp)}</b> instead. Links you click still use the usual address.</p>`
-      : `<div class="warn"><b>${who}</b> is on a macvlan network (${esc(dashC.macvlan_ip)}), so it can't reach this server at its usual address. Set a <b>Macvlan helper IP</b> in Settings (and NET_ADMIN in docker-compose.yml); its status checks then go through that address.</div>`) + h;
-  }
-  $('intBody').innerHTML = h;
-  if (intTab === 'heimdall') loadHeimdall();
-  if (SETUP_KINDS.includes(intTab)) loadDashSetup(intTab);
+    payload: '{"block": true}'`, 'Only if you don\'t use the HACS integration.');
 }
+$('haTokens').onclick = () => { $('dlg').close(); openSettings('ha'); };
+
+/* copy buttons in both windows */
+document.addEventListener('click', async (e) => {
+  const c = e.target.closest('button[data-copy]');
+  if (!c) return;
+  try { await navigator.clipboard.writeText(c.dataset.copy); c.textContent = 'Copied'; }
+  catch {
+    const box = c.closest('.addr') ? c.closest('.addr').querySelector('input') : c.parentElement.nextElementSibling;
+    if (box && box.select) box.select(); else if (box) getSelection().selectAllChildren(box);
+    c.textContent = 'Press Ctrl+C';
+  }
+  setTimeout(() => { c.textContent = 'Copy'; }, 1500);
+});
+
+/* ---------- System Settings ---------- */
+function showSetTab(t) {
+  document.querySelectorAll('#setTabs > button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.t === t)));
+  document.querySelectorAll('#setDlg .section[data-p]').forEach(s => { s.hidden = s.dataset.p !== t; });
+}
+$('setTabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-t]'); if (b) showSetTab(b.dataset.t); });
+$('settingsBtn').onclick = () => openSettings('general');
+$('setCancel').onclick = $('setClose').onclick = () => $('setDlg').close();
 async function loadTokens() {
   try {
     const d = await api('/tokens');
@@ -2025,52 +2346,26 @@ async function loadTokens() {
       <span class="sub">${esc(t.hint)} · made ${esc(new Date(t.created * 1000).toLocaleDateString())} · ${t.last_used ? 'last used ' + esc(ago(Date.now() / 1000 - t.last_used)) : 'never used'}</span>
       <button type="button" class="danger" data-revoke="${esc(t.id)}">Revoke</button></div>`).join('')
       : '<p class="hint" style="margin:0">No tokens yet.</p>';
-  } catch (e) { $('intErr').textContent = e.message; }
+  } catch (e) { $('setErr').textContent = e.message; }
 }
-$('intBtn').onclick = async () => {
-  $('intErr').textContent = ''; $('tokNew').innerHTML = '';
-  let maintItems = [];
-  try { await refresh(); maintItems = (await api('/maintenance')).items; } catch (e) {}
-  intItems = services.map(sv => ({ name: sv.name, controlled: true, link: linksFor(sv)[0] }))
-    .concat(maintItems.filter(m => m.schedule && !m.controlled && m.status !== 'missing').map(m => ({ name: m.name, controlled: false })));
-  const keep = $('intApp').value;
-  $('intApp').innerHTML = intItems.map(i => `<option value="${esc(i.name)}">${esc(i.name)}${i.controlled ? '' : ' (restart schedule only)'}</option>`).join('');
-  if (intItems.some(i => i.name === keep)) $('intApp').value = keep;
-  renderInt();
-  loadTokens();
-  $('intDlg').showModal();
-};
-$('intClose').onclick = () => $('intDlg').close();
-$('intApp').addEventListener('change', renderInt);
-$('intTabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-t]'); if (b) { intTab = b.dataset.t; renderInt(); } });
-$('intForm').addEventListener('click', async (e) => {
-  const c = e.target.closest('button[data-copy]');
-  if (c) {
-    try { await navigator.clipboard.writeText(c.dataset.copy); c.textContent = 'Copied'; }
-    catch { const pre = c.parentElement.nextElementSibling; getSelection().selectAllChildren(pre); c.textContent = 'Press Ctrl+C'; }
-    setTimeout(() => { c.textContent = 'Copy'; }, 1500);
-    return;
-  }
+$('tokList').addEventListener('click', async (e) => {
   const r = e.target.closest('button[data-revoke]');
-  if (r) {
-    if (!confirm('Revoke this token? Anything using it (like Home Assistant) stops working until you give it a new one.')) return;
-    try { await api(`/tokens/${encodeURIComponent(r.dataset.revoke)}`, { method: 'DELETE' }); } catch (err) { $('intErr').textContent = err.message; }
-    loadTokens();
-  }
+  if (!r) return;
+  if (!confirm('Revoke this token? Anything using it (like Home Assistant) stops working until you give it a new one.')) return;
+  try { await api(`/tokens/${encodeURIComponent(r.dataset.revoke)}`, { method: 'DELETE' }); } catch (err) { $('setErr').textContent = err.message; }
+  loadTokens();
 });
-$('intForm').addEventListener('submit', (e) => e.preventDefault());
+$('tokName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('tokCreate').click(); } });
 $('tokCreate').onclick = async () => {
-  const f = $('intForm');
-  $('intErr').textContent = '';
+  $('setErr').textContent = '';
   try {
-    const t = await api('/tokens', { method: 'POST', body: JSON.stringify({ name: f.tokname.value.trim() || 'Home Assistant' }) });
-    f.tokname.value = '';
+    const t = await api('/tokens', { method: 'POST', body: JSON.stringify({ name: $('tokName').value.trim() || 'Home Assistant' }) });
+    $('tokName').value = '';
     $('tokNew').innerHTML = `<div class="newtok"><b>Copy this token now. It won't be shown again.</b><code>${esc(t.token)}</code>
       <div><button type="button" data-copy="${esc(t.token)}">Copy</button></div></div>`;
     loadTokens();
-  } catch (err) { $('intErr').textContent = err.message; }
+  } catch (err) { $('setErr').textContent = err.message; }
 };
-
 /* ---------- companion containers ---------- */
 function renderCompanions(c, svc) {
   const main = c ? c.name : (svc && svc.container);
@@ -2091,17 +2386,13 @@ function renderCompanions(c, svc) {
 
 async function loadSettings() { try { settingsCache = await api('/settings'); } catch {} }
 loadSettings();
+loadDashApps();
 refresh();
 refreshContainers();
 refreshSavings();
 setInterval(refreshSavings, 10000);
 setInterval(refresh, 3000);
 setInterval(refreshContainers, 10000);
-setInterval(renderServices, 1000);
-refreshMaint();
-showTab(tab);
-let mTick = 0;
-setInterval(() => { if (tab === 'maint' || ++mTick % 10 === 0) refreshMaint(); }, 3000);
 </script>
 </body>
 </html>

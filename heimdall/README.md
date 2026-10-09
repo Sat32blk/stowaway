@@ -18,7 +18,7 @@ Alternatively, put the Stowaway dashboard address (`http://192.168.1.2:8880`) in
 
 ## Adding it to Heimdall
 
-**The easy way:** in the Stowaway dashboard, open **Integrations → Heimdall**, pick an app and click **Add *app* to Heimdall**. That adds the tile type if needed and creates (or converts) the app's tile with its own icon, link and status. To only add the tile type, use **Add the Stowaway tile to heimdall** under *Or by hand*. Stowaway copies the files into Heimdall and registers the tile. This works with the linuxserver Heimdall image, which keeps the tile on its `/config` volume, so it stays through Heimdall updates. Reload Heimdall in your browser afterwards.
+**The easy way:** in the Stowaway dashboard, open an app's **Settings → Dashboards** and click **Add to Heimdall**. That adds the tile type if needed and creates (or converts) the app's tile with its own icon, link and status. Stowaway copies the files into Heimdall and registers the tile. This works with the linuxserver Heimdall image, which keeps the tile on its `/config` volume, so it stays through Heimdall updates. Reload Heimdall in your browser afterwards.
 
 **By hand:** these steps assume the linuxserver Heimdall container is named `heimdall`.
 

@@ -1,7 +1,7 @@
 """Set up dashboards (Homarr, Homepage, Glance) to show Stowaway's status.
 
 Nothing here runs on its own: each function is called when the user picks apps
-in Integrations and clicks the button for that dashboard.
+in an app's Settings → Dashboards and clicks the button for that dashboard.
 """
 from __future__ import annotations
 
@@ -119,7 +119,7 @@ def glance_file(items: list[dict], base: str, title: str) -> str:
         {"type": "custom-api", "title": "Stowaway", "url": f"{base}/status", "cache": "30s",
          "template": GLANCE_TEMPLATE},
     ]
-    head = ("# Written by Stowaway (Integrations > Glance). Clicking the button there again replaces this file.\n"
+    head = ("# Written by Stowaway (an app's Settings > Dashboards > Glance). Clicking the button there again replaces this file.\n"
             "# Use it in glance.yml with a line like:  - $include: stowaway.yml  (inside a column's widgets)\n")
     return head + yaml.safe_dump(widgets, sort_keys=False, allow_unicode=True, width=1000)
 

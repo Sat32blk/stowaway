@@ -545,7 +545,7 @@ class Shim:
         shim_ip = reg.settings.get("macvlan_shim_ip")
         if not shim_ip:
             raise RuntimeError("This container is on a macvlan network. Set a helper IP address "
-                               "in Settings so Stowaway can reach it.")
+                               "in System Settings → Network so Stowaway can reach it.")
         if not parent:
             raise RuntimeError("Can't tell which network card this macvlan network uses.")
         if DEMO:
@@ -656,6 +656,7 @@ class Service:
         self.companion_error = None
         self.lock = asyncio.Lock()
         self.comp_samples: dict = {}  # companion -> previous raw counters
+        self.comp_stats: dict = {}    # companion -> {"cpu": %, "mem": MB}
         self.update(cfg)
 
     def update(self, cfg: dict):
@@ -728,7 +729,9 @@ class Service:
         return cfg
 
     def to_api(self) -> dict:
+        st = app_status(self)
         return {
+            **{k: st[k] for k in ("indicator", "indicator_color", "indicator_hex", "sleeps_at")},
             "name": self.name,
             **self.to_config(),
             "upstream": self.upstream,
@@ -750,7 +753,10 @@ class Service:
             "companions": self.companions,
             "companion_error": self.companion_error,
             "companion_status": {c: driver.cached_status(c) for c in self.companions},
+            "companion_stats": self.comp_stats,
             "maintenance": maint_brief(self.container),
+            "updates": update_state(self.container),
+            "last_open": opened.get(self.name),
         }
 
 
@@ -1213,7 +1219,7 @@ async def ensure_running(svc: Service):
                 if swapped:
                     new_id, old_id, info = swapped
                     svc.update_error, svc.update_skip = None, None
-                    svc.update_info = {**(svc.update_info or {}), "status": "current", "updated_at": time.time()}
+                    mark_current(svc.container)
                     reg.save()
                     log.info("%s is now running the newest %s", svc.name, info["ref"])
                     spawn(driver.commit(old_id))
@@ -1326,6 +1332,7 @@ async def sample_activity(svc: Service, now: float):
     cur = await driver.stats(svc.container)
     if not cur:
         svc.stats, svc.sample, svc.busy_now = None, None, False
+        svc.comp_stats = {}
         return
     cur["t"] = now
     prev, svc.sample = svc.sample, cur
@@ -1363,6 +1370,8 @@ async def sample_activity(svc: Service, now: float):
         total_cpu += ccpu
         if cc.get("mem") is not None and total_mem is not None:
             total_mem += cc["mem"] / 1048576
+        svc.comp_stats[c] = {"cpu": round(ccpu, 1),
+                             "mem": None if cc.get("mem") is None else round(cc["mem"] / 1048576)}
         if ccpu >= cpu_t or (cnet is not None and cnet >= net_t):
             busy, busy_by = True, busy_by or f"{c} ({ccpu:.0f}% CPU)"
     if svc.companions:
@@ -1390,6 +1399,243 @@ def activity_api(svc: Service) -> dict:
         "forced_until": until,
         "next_awake": next_window(svc, now) if svc.awake_hours else None,
     }
+
+
+# ---- CPU and memory of every container, for the app list ----
+USAGE_EVERY = float(os.environ.get("USAGE_INTERVAL", "20"))
+USAGE: dict[str, dict] = {}         # container -> {"cpu": %, "mem": MB}, for containers not sampled elsewhere
+_usage_prev: dict[str, dict] = {}
+
+
+def usage_of(name: str):
+    """Latest CPU (% of one core) and memory (MB) of a running container, or None."""
+    svc = reg.by_container(name)
+    if svc:
+        return {"cpu": svc.stats["cpu"], "mem": svc.stats.get("mem")} if svc.stats else None
+    owner = reg.companion_of(name)
+    if owner:
+        return owner.comp_stats.get(name)
+    return USAGE.get(name)
+
+
+async def usage_tick():
+    covered = set()
+    for svc in reg.services.values():
+        covered.add(svc.container)
+        covered.update(svc.companions)
+    names = [c["name"] for c in await driver.list()
+             if c["status"] == "running" and c["name"] not in covered and c["name"] != SELF_NAME]
+    sem = asyncio.Semaphore(6)
+
+    async def one(name):
+        async with sem:
+            with contextlib.suppress(Exception):
+                cur = await asyncio.wait_for(driver.stats(name), 15)
+                if not cur:
+                    return
+                cur["t"] = time.time()
+                prev, _usage_prev[name] = _usage_prev.get(name), cur
+                if not prev or cur["t"] <= prev["t"]:
+                    return
+                dsys = cur["system"] - prev["system"]
+                cpu = max(0.0, (cur["cpu"] - prev["cpu"]) / dsys * cur["ncpu"] * 100) if dsys > 0 else 0.0
+                USAGE[name] = {"cpu": round(cpu, 1),
+                               "mem": None if cur.get("mem") is None else round(cur["mem"] / 1048576)}
+    await asyncio.gather(*(one(n) for n in names))
+    for gone in set(USAGE) - set(names):
+        USAGE.pop(gone, None)
+        _usage_prev.pop(gone, None)
+
+
+async def usage_loop():
+    while True:
+        await asyncio.sleep(USAGE_EVERY)
+        try:
+            await usage_tick()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.debug("usage sampling failed", exc_info=True)
+        save_opened()
+
+
+# ---- What opened (or woke) each app last ----
+OPENED_PATH = CONFIG_PATH.parent / "opened.json"
+opened: dict[str, dict] = {}        # app name -> {"kind", "at", "ip", "ua", "host", "detail"}
+_opened_dirty = False
+_rdns: dict[str, tuple[str | None, float]] = {}    # ip -> (hostname or None, when looked up)
+
+
+def load_opened():
+    global opened
+    with contextlib.suppress(Exception):
+        data = json.loads(OPENED_PATH.read_text())
+        if isinstance(data, dict):
+            opened = {k: v for k, v in data.items() if isinstance(v, dict)}
+
+
+def save_opened():
+    global _opened_dirty
+    if _opened_dirty:
+        _opened_dirty = False
+        with contextlib.suppress(Exception):
+            write_private(OPENED_PATH, json.dumps(opened))
+
+
+def _short_host(name: str | None, ip: str) -> str | None:
+    if not name or name == ip:
+        return None
+    name = name.rstrip(".")
+    # "livingroom-tv.lan" -> "livingroom-tv"; keep the full name if it's an internet one
+    first, _, rest = name.partition(".")
+    if not rest or rest.lower() in ("lan", "local", "home", "localdomain", "home.arpa", "internal", "router"):
+        return first
+    return name
+
+
+async def _lookup_host(ip: str):
+    """The device's network name from reverse DNS (most home routers answer for DHCP clients)."""
+    name = None
+    with contextlib.suppress(Exception):
+        loop = asyncio.get_running_loop()
+        name = (await asyncio.wait_for(loop.run_in_executor(None, socket.gethostbyaddr, ip), 3))[0]
+    host = _short_host(name, ip)
+    _rdns[ip] = (host, time.time())
+    if host:
+        global _opened_dirty
+        for rec in opened.values():
+            if rec.get("ip") == ip and not rec.get("host"):
+                rec["host"] = host
+                _opened_dirty = True
+
+
+def api_kind(request: Request) -> str:
+    who = f"{getattr(request.state, 'token', '')} {request.headers.get('user-agent', '')}".lower()
+    return "ha" if "home assistant" in who or "homeassistant" in who or "home-assistant" in who else "api"
+
+
+def note_open(svc: Service, kind: str, request=None, detail: str | None = None):
+    """Remember what opened or woke an app: a visit (device), Home Assistant or another
+    API client, the Wake button here, or its awake hours."""
+    global _opened_dirty
+    now = time.time()
+    ip = request.client.host if request is not None and request.client else None
+    prev = opened.get(svc.name)
+    if (kind == "visit" and prev and prev.get("kind") == "visit" and prev.get("ip") == ip
+            and now - prev.get("at", 0) < 30):
+        prev["at"] = now                # same device still using it: just move the time on
+        return
+    rec = {"kind": kind, "at": now}
+    if ip:
+        rec["ip"] = ip
+        if request is not None and kind == "visit":
+            rec["ua"] = request.headers.get("user-agent", "")[:300]
+        cached = _rdns.get(ip)
+        if cached and now - cached[1] < 3600:
+            if cached[0]:
+                rec["host"] = cached[0]
+        elif not DEMO:
+            spawn(_lookup_host(ip))
+    if detail:
+        rec["detail"] = str(detail)[:80]
+    opened[svc.name] = rec
+    _opened_dirty = True
+
+
+# ---- Update checks for any container ----
+CHECK_DEFAULT_HOURS = 24.0
+
+
+def check_every(name: str) -> float:
+    """Hours between update checks; apps Stowaway manages are checked daily unless changed."""
+    e = reg.maintenance.get(name) or {}
+    if "check_every" in e:
+        return float(e.get("check_every") or 0)
+    return CHECK_DEFAULT_HOURS if reg.by_container(name) else 0.0
+
+
+def latest_update_info(name: str):
+    e = reg.maintenance.get(name) or {}
+    svc = reg.by_container(name)
+    found = [i for i in (e.get("update_info"), svc.update_info if svc else None) if i]
+    return max(found, key=lambda i: i.get("at") or 0) if found else None
+
+
+def mark_current(name: str):
+    """After installing a new version: nothing is waiting any more."""
+    now = time.time()
+    e = maint_entry(name)
+    e["update_info"] = {**(e.get("update_info") or {}), "status": "current", "at": now}
+    svc = reg.by_container(name)
+    if svc:
+        svc.update_info = {**(svc.update_info or {}), "status": "current", "at": now, "updated_at": now}
+
+
+def update_state(name: str) -> dict:
+    e = reg.maintenance.get(name) or {}
+    svc = reg.by_container(name)
+    info = latest_update_info(name) or {}
+    skip = {e.get("update_skip"), svc.update_skip if svc else None} - {None}
+    sched = e.get("schedule") or None
+    auto, nxt = None, None
+    if sched and sched.get("update"):
+        auto = "schedule"
+        with contextlib.suppress(Exception):
+            nxt = maint.next_run(sched, e.get("anchor") or time.time(), local_tz())
+    elif svc and svc.update_on_wake:
+        auto = "wake"
+    return {
+        "available": info.get("status") == "update" and info.get("remote") not in skip,
+        "failed_before": info.get("status") == "update" and info.get("remote") in skip,
+        "status": info.get("status"),
+        "detail": info.get("detail"),
+        "checked_at": info.get("at"),
+        "check_every": check_every(name),
+        "auto": auto,
+        "next_restart": nxt,
+        "next_restart_text": _short_when(nxt) if nxt else None,
+        "installing": name in maint_state or bool(svc and svc.transition == "updating"),
+    }
+
+
+async def check_container_update(name: str) -> dict:
+    now = time.time()
+    try:
+        info = await asyncio.wait_for(driver.check_update(name), 30)
+    except Exception as e:
+        info = {"status": "error", "detail": str(e) or "no answer from the image registry"}
+    log.debug("update check for %s: %s", name, info)
+    info = {**info, "at": now}
+    maint_entry(name)["update_info"] = info
+    svc = reg.by_container(name)
+    if svc:
+        svc.update_info = info
+        svc.update_checked = now
+    reg.save()
+    return info
+
+
+async def update_check_loop():
+    await asyncio.sleep(90)
+    while True:
+        try:
+            for c in await driver.list():
+                name = c["name"]
+                if name == SELF_NAME or name.endswith(updates.OLD_SUFFIX) or name in maint_state:
+                    continue
+                every = check_every(name)
+                if every <= 0:
+                    continue
+                last = (latest_update_info(name) or {}).get("at") or 0
+                if time.time() - last >= every * 3600:
+                    await check_container_update(name)
+                    await asyncio.sleep(2)            # go easy on the registries
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("update checks")
+        save_opened()
+        await asyncio.sleep(300)
 
 
 STATS_EVERY = float(os.environ.get("STATS_INTERVAL", "15"))   # seconds between CPU/network samples
@@ -1425,12 +1671,15 @@ async def check(svc: Service, now: float):
             await sample_activity(svc, now)
     else:
         svc.stats, svc.sample, svc.busy_now = None, None, False
+        svc.comp_stats = {}
 
     if reason:
         # Start right away; after a failed start, retry every 5 minutes. Not while "don't wake" is on.
         if svc.status != "running" and not svc.block_wake and (not svc.error or now - svc.auto_start_at > 300):
             svc.auto_start_at = now
             log.info("starting %s (%s)", svc.name, "keep awake" if reason == "hold" else "awake hours")
+            if reason == "schedule":
+                note_open(svc, "schedule")
             kick(svc)
         return
 
@@ -1564,7 +1813,6 @@ def app_status(svc: "Service") -> dict:
     if state == "starting" and svc.start_began and svc.start_duration:
         eta = max(0.0, svc.start_duration - (now - svc.start_began))
     m = maint_brief(svc.container)
-    upd = svc.update_info or {}
     if state == "running":
         if reason == "hold":
             summary = "Awake · kept awake" + (f" until {_short_when(until)}" if until else "")
@@ -1620,7 +1868,7 @@ def app_status(svc: "Service") -> dict:
         "eta": eta,
         "error": svc.error if state == "failed" else None,
         "update": svc.update_progress if state == "updating" else None,
-        "update_available": upd.get("status") == "update" and upd.get("remote") != svc.update_skip,
+        "update_available": update_state(svc.container)["available"],
         "link_port": svc.link_port,
         "maintenance": m,
         "idle_timeout": svc.idle_timeout,
@@ -1657,6 +1905,7 @@ HEALTH_WAIT = float(os.environ.get("MAINT_HEALTH_WAIT", "300"))     # wait for "
 BUSY_RETRY = float(os.environ.get("MAINT_BUSY_RETRY", "600"))       # re-check a busy container after this
 maint_state: dict[str, dict] = {}      # container -> live progress of a running job
 maint_queue: list[str] = []            # "Run now" requests, in order
+maint_force_update: set[str] = set()   # queued with "Update now": install a newer version even without a schedule
 maint_wake = asyncio.Event()
 
 
@@ -1806,7 +2055,7 @@ async def maintain_update(name: str, svc: Service | None, info: dict, running: b
     maint_entry(name).pop("update_skip", None)
     if svc:
         svc.update_skip, svc.update_error = None, None
-        svc.update_info = {**(svc.update_info or {}), "status": "current", "updated_at": time.time()}
+    mark_current(name)
     if not running:
         # It was asleep: it was only started to make sure the new version works.
         if not (svc and forced(svc, time.time())[0]):
@@ -1859,9 +2108,11 @@ async def maintain(name: str, sched: dict, st: dict):
     return "ok", (f"Restarted ({time.time() - t0:.0f}s). " + note).strip()
 
 
-async def run_maintenance(name: str, manual: bool = False):
+async def run_maintenance(name: str, manual: bool = False, force_update: bool = False):
     entry = maint_entry(name)
-    sched = entry.get("schedule") or {"update": False}
+    sched = dict(entry.get("schedule") or {"update": False})
+    if force_update:
+        sched["update"] = True
     svc = reg.by_container(name)
     began = time.time()
     st = maint_state[name] = {"phase": "starting", "pct": None, "since": began, "manual": manual}
@@ -1901,7 +2152,9 @@ def record(name: str, result: str, msg: str):
 
 async def maintenance_tick():
     while maint_queue:
-        await run_maintenance(maint_queue[0], manual=True)
+        first = maint_queue[0]
+        await run_maintenance(first, manual=True, force_update=first in maint_force_update)
+        maint_force_update.discard(first)
         maint_queue.pop(0)
     now, tz = time.time(), local_tz()
     for name, entry in list(reg.maintenance.items()):
@@ -2011,6 +2264,7 @@ async def startup():
         return
     _started = True
     log.info("Stowaway %s starting", VERSION)
+    load_opened()
     if float(reg.settings.get("debug_until") or 0) > time.time():
         diagnostics.set_debug(True, float(reg.settings["debug_until"]))
     await driver.connect()
@@ -2026,9 +2280,16 @@ async def startup():
     app.state.reaper = asyncio.create_task(reaper())
     app.state.maintenance = asyncio.create_task(maintenance_loop())
     app.state.peers = asyncio.create_task(macvlan_peers_loop())
+    app.state.usage = asyncio.create_task(usage_loop())
+    app.state.upd_checks = asyncio.create_task(update_check_loop())
 
 
 async def shutdown():
+    global _opened_dirty
+    _opened_dirty = True
+    save_opened()
+    app.state.usage.cancel()
+    app.state.upd_checks.cancel()
     app.state.peers.cancel()
     app.state.reaper.cancel()
     app.state.maintenance.cancel()
@@ -2130,7 +2391,7 @@ def gate(request: Request):
     ip = request.client.host if request.client else ""
     if reg.settings.get("admin_lan_only", True) and not is_home_network(ip):
         raise HTTPException(403, "The Stowaway dashboard is only available on your home network "
-                                 "(Settings → HTTPS → 'Only allow the dashboard from my home network').")
+                                 "(System Settings → HTTPS & access → 'Only allow this dashboard from my home network').")
     # Changes must come from the dashboard itself, not from another website (CSRF).
     if request.method not in ("GET", "HEAD"):
         origin = request.headers.get("origin")
@@ -2536,6 +2797,9 @@ async def list_containers():
             "macvlan_ip": macvlan_ip(info, mv),
             "suggested_port": app_port,
             "suggested_link_port": link_port,
+            "usage": usage_of(info["name"]) if info["status"] == "running" else None,
+            "updates": update_state(info["name"]),
+            "maintenance": maint_brief(info["name"]),
         })
     return out
 
@@ -2636,6 +2900,7 @@ async def put_settings(body: SettingsIn):
         "homarr_url": homarr_url,
         "homarr_key": (homarr_key or old.get("homarr_key", "")) if homarr_url else "",
         "debug_until": old.get("debug_until", 0),
+        "dash_apps": old.get("dash_apps", {}),
     }
     https_keys = ("https_enabled", "https_port", "https_domain", "cert_source", "le_email", "le_staging",
                   "duckdns_token", "cloudflare_token", "http_challenge_port")
@@ -2723,6 +2988,8 @@ async def start(name: str):
     if svc.block_wake:
         svc.block_wake = False          # waking it by hand switches it back on
         reg.save()
+    if svc.status != "running" or svc.transition:
+        note_open(svc, "dashboard")
     kick(svc)
     return svc.to_api()
 
@@ -2760,6 +3027,7 @@ async def hold(name: str, body: HoldIn):
     reg.save()
     if svc.keep_awake and (svc.status != "running" or svc.transition == "stopping"):
         svc.auto_start_at = now
+        note_open(svc, "dashboard", detail="Keep awake")
         kick(svc)
     return svc.to_api()
 
@@ -2896,15 +3164,40 @@ async def delete_maintenance(name: str):
 
 
 @admin.post("/api/maintenance/{name}/run", status_code=202)
-async def run_maintenance_now(name: str):
+async def run_maintenance_now(name: str, update: bool = False):
     maint_target(name)
     if name in maint_state or name in maint_queue:
         raise HTTPException(409, "already running or waiting its turn")
     if await driver.status(name) == "missing":
         raise HTTPException(404, f"no container named '{name}'")
+    if update:
+        maint_force_update.add(name)
     maint_queue.append(name)
     maint_wake.set()
     return {"queued": True}
+
+
+class CheckEveryIn(BaseModel):
+    check_every: float = 24
+
+
+@admin.put("/api/updates/{name}")
+async def set_update_checks(name: str, body: CheckEveryIn):
+    maint_target(name)
+    if not 0 <= body.check_every <= 24 * 30:
+        raise HTTPException(400, "check every 0 (off) to 720 hours")
+    maint_entry(name)["check_every"] = body.check_every
+    reg.save()
+    return update_state(name)
+
+
+@admin.post("/api/updates/{name}/check")
+async def check_updates_now(name: str):
+    maint_target(name)
+    if await driver.status(name) == "missing":
+        raise HTTPException(404, f"no container named '{name}'")
+    await check_container_update(name)
+    return update_state(name)
 
 
 @admin.post("/api/maintenance/{name}/retry-update")
@@ -2970,6 +3263,7 @@ async def heimdall_tile(body: HeimdallTileIn):
     if not c["running"]:
         raise HTTPException(409, f"Start {body.container} first.")
     if DEMO:
+        record_dash("heimdall", [item["name"]])
         return {"ok": True, "message": f"Added {item['name']} to Heimdall with its own icon (demo)."}
     dk = driver.dk
     apps_dir, icons_dir = await heimdall_paths(body.container)
@@ -3024,6 +3318,7 @@ async def heimdall_tile(body: HeimdallTileIn):
     else:
         raise HTTPException(500, "Heimdall didn't say whether the tile was saved.")
     msg += f": it opens {item['name']} through Stowaway and shows whether it's awake." + icon_note
+    record_dash("heimdall", [item["name"]])
     log.info("%s", msg)
     return {"ok": True, "message": msg}
 
@@ -3064,6 +3359,19 @@ async def dash_items(apps: list) -> list[dict]:
         out.append({"name": svc.name, "link": link,
                     "icon": dashsetup.icon_slug(images.get(svc.container, ""), svc.name)})
     return out
+
+
+def record_dash(kind: str, names: list[str], replace: bool = False):
+    """Remember which apps were put on which dashboard, for each app's Dashboards tab."""
+    d = reg.settings.setdefault("dash_apps", {})
+    cur = [] if replace else list(d.get(kind) or [])
+    d[kind] = sorted(set(cur) | set(names))
+    reg.save()
+
+
+@admin.get("/api/dash-apps")
+async def dash_apps():
+    return reg.settings.get("dash_apps") or {}
 
 
 def dash_base(base: str) -> str:
@@ -3121,6 +3429,7 @@ async def dash_homepage(body: HomepageIn):
     attrs = await dash_target("homepage", body.container)
     block = dashsetup.homepage_block(group, items, base)
     if DEMO:
+        record_dash("homepage", [i["name"] for i in items], replace=True)
         return {"ok": True, "message": f"Wrote {len(items)} app(s) to services.yaml (demo)."}
     path = homepage_path(attrs)
     data, info = await driver.dk.get_archive(body.container, path)
@@ -3135,6 +3444,7 @@ async def dash_homepage(body: HomepageIn):
         await dashsetup.write_file(driver.dk, body.container, backup, data, info)
     await dashsetup.write_file(driver.dk, body.container, path, new.encode(), info)
     log.info("wrote %d app(s) to Homepage's services.yaml in %s", len(items), body.container)
+    record_dash("homepage", [i["name"] for i in items], replace=True)
     msg = f"Wrote {len(items)} app(s) to the \"{group}\" group in services.yaml."
     if data and not have_backup:
         msg += " Your original was saved as services.yaml.before-stowaway."
@@ -3156,6 +3466,7 @@ async def dash_glance(body: GlanceIn):
     attrs = await dash_target("glance", body.container)
     content = dashsetup.glance_file(items, base, (body.title or "").strip()[:60] or "Apps")
     if DEMO:
+        record_dash("glance", [i["name"] for i in items], replace=True)
         return {"ok": True, "included": False, "message": f"Wrote stowaway.yml with {len(items)} app(s) (demo)."}
     main_cfg = glance_path(attrs)
     data, info = await driver.dk.get_archive(body.container, main_cfg)
@@ -3164,6 +3475,7 @@ async def dash_glance(body: GlanceIn):
     path = posixpath.join(posixpath.dirname(main_cfg), dashsetup.GLANCE_FILE)
     await dashsetup.write_file(driver.dk, body.container, path, content.encode(), info)
     included = dashsetup.glance_includes(data.decode("utf-8", "replace"))
+    record_dash("glance", [i["name"] for i in items], replace=True)
     log.info("wrote %s with %d app(s) in %s", path, len(items), body.container)
     msg = f"Wrote stowaway.yml with {len(items)} app(s)."
     msg += (" Glance picks up the change by itself." if included else
@@ -3183,11 +3495,11 @@ class HomarrTestIn(BaseModel):
 
 
 def homarr_conn(url: str = "", key: str = ""):
-    """Homarr's address and key: the ones given, or the ones saved in Settings."""
+    """Homarr's address and key: the ones given, or the ones saved in System Settings."""
     url = url.strip() or reg.settings.get("homarr_url", "")
     key = "".join((key or "").split()) or reg.settings.get("homarr_key", "")
     if not url or not key:
-        raise HTTPException(409, "Set Homarr's address and API key in Settings first.")
+        raise HTTPException(409, "Set Homarr's address and API key in System Settings → Dashboards first.")
     try:
         return dashsetup.check_url(url, "Homarr's address"), key
     except dashsetup.SetupError as e:
@@ -3267,6 +3579,7 @@ async def homarr_add(body: HomarrAddIn):
                    f"with {item['name']}; turn on its status option for the dot.")
     except dashsetup.SetupError as e:
         raise HTTPException(400, str(e))
+    record_dash("homarr", [item["name"]])
     log.info("Homarr: %s", msg)
     return {"ok": True, "updated": bool(a), "message": msg}
 
@@ -3529,6 +3842,7 @@ async def v1_wake(request: Request, name: str):
     set_block(svc, False)                  # waking on purpose switches it back on
     svc.last_activity = time.time()
     if svc.status != "running" or svc.transition:
+        note_open(svc, api_kind(request), request, getattr(request.state, "token", None))
         kick(svc)
     return _with_link(app_status(svc), request)
 
@@ -3563,7 +3877,10 @@ async def v1_block(request: Request, name: str, body: BlockIn):
 @admin.post("/api/v1/apps/{name}/keep-awake")
 async def v1_keep_awake(request: Request, name: str, body: KeepAwakeIn):
     svc = _need_svc((await _v1_item(name, request))[0], name)
+    asleep = svc.status != "running" or svc.transition == "stopping"
     await hold(svc.name, HoldIn({"minutes": body.minutes, "forever": body.forever}))
+    if asleep:
+        note_open(svc, api_kind(request), request, getattr(request.state, "token", None))
     return _with_link(app_status(svc), request)
 
 
@@ -3924,6 +4241,7 @@ async def public_wake(request: Request, name: str):
     if svc.block_wake and svc.status != "running":
         raise HTTPException(409, f"{svc.name} is switched off for now and can't be woken.")
     svc.last_activity = time.time()
+    note_open(svc, "visit", request)
     if svc.status != "running" or svc.transition:
         kick(svc)
     return {"name": svc.name}
@@ -4120,6 +4438,7 @@ async def ws_proxy(ws: WebSocket, path: str):
         await ws.close(code=1013)          # "try again later": switched off for now
         return
     svc.last_activity = time.time()
+    note_open(svc, "visit", ws)
     if svc.status != "running" or svc.transition:
         try:
             await ensure_running(svc)          # a live connection to a sleeping app wakes it
@@ -4242,6 +4561,7 @@ async def proxy(request: Request, path: str):
         return JSONResponse({"error": f"{svc.name} is switched off for now"}, 503,
                             headers={"Retry-After": "300", "X-Stowaway-State": "switched-off"})
     svc.last_activity = time.time()
+    note_open(svc, "visit", request)
     direct = direct_url(svc, request) if svc.open_mode == "direct" else None
     if svc.status != "running" or svc.transition:
         log.debug("%s %s for %s from %s: app is %s, %s", request.method, request.url.path, svc.name, who,

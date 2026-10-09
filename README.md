@@ -12,23 +12,24 @@ Plenty of containers only get used now and then: a photo editor you open once a 
 
 It's also great for trying things out. Install as many containers as you like without worrying about them eating up your server's resources: the ones you're not using just sleep.
 
-Everything is managed from a web dashboard that lists every container on your server. Tick **Enable Stowaway** on the ones it should manage, and it shows you how much memory and CPU it's saving.
+Everything is managed from a web dashboard that lists every container on your server in one list. Each app's panel shows how it sleeps, whether an update is waiting, its CPU and memory use, and what opened it last. Click **Let Stowaway manage** on the ones it should put to sleep, and the top of the page shows how much memory and CPU it's saving.
 
 ![Stowaway dashboard](docs/screenshots/dashboard.png)
 
 - **Wake on demand:** a start page while the app wakes, then straight into the app. Media apps on TVs, API clients and live connections (WebSockets) work too.
 - **Never sleeps a busy app:** CPU and network activity count as use. Keep apps awake on demand or during set hours.
 - **Resources saved:** see how much memory and CPU sleeping apps are freeing.
-- **Updates on wake:** optionally install a newer image when an app wakes, and go back to the old one if the new one won't start.
-- **Scheduled maintenance:** restart (and optionally update) any container daily, weekly or monthly.
+- **Updates:** see at a glance which containers have a newer version, install it with one click or automatically (when the app wakes, or at a scheduled restart), and go back to the old one if the new one won't start.
+- **Scheduled restarts:** restart (and optionally update) any container daily, weekly or monthly.
 - **Companion containers:** helpers like Tdarr's nodes wake and sleep with their app.
-- **Status on your dashboard:** awake/asleep dots and next restart for Homarr, Homepage, Dashy, Glance and Heimdall. Stowaway can set up Homarr, Homepage, Glance and Heimdall for you with one click, including dashboards on macvlan.
+- **Status on your dashboard:** In Use / Sleeping in 8 min / Ready to Sleep / Sleeping labels and awake/asleep dots for Homarr, Homepage, Dashy, Glance and Heimdall. Each app's settings can add it to Homarr, Homepage, Glance or Heimdall with one click, including dashboards on macvlan.
 - **Fits your setup:** macvlan/ipvlan containers, HTTPS with Let's Encrypt, and a [Home Assistant integration](https://github.com/Sat32blk/Stowaway-homeassistant).
 - **Light:** about 40 MB of memory and under 0.1% of one CPU core while idle.
 
 | | |
 |---|---|
-| ![Maintenance tab](docs/screenshots/maintenance.png) | ![Start page](docs/screenshots/start-page.png) |
+| ![App settings](docs/screenshots/app-settings.png) | ![Updates and restarts](docs/screenshots/updates.png) |
+| ![Dashboards tab](docs/screenshots/dashboards.png) | ![Start page](docs/screenshots/start-page.png) |
 
 ```
 link / Heimdall / Homarr tile ──► stowaway ──► asleep? ── yes ──► docker start, show "Starting…" page
@@ -81,25 +82,41 @@ Keep the container named `stowaway` (so it doesn't list itself as an app), or se
 
 ## Using it
 
-1. In **Containers on this server**, tick **Enable Stowaway** next to an app.
-2. Check the suggested ports and click **Enable Stowaway**. The checkbox then reads **Stowaway Enabled**:
-   - **Link port** is the new address that wakes the app, e.g. `http://192.168.1.2:18096`. Put this in Heimdall, Homarr or a bookmark.
-   - **App port** is the port the app listens on inside its container. It's filled in from the container's settings.
-   - **Put it to sleep** *automatically* after a number of idle minutes, or *only when I say so* (Home Assistant, the API or by hand).
-3. The app now appears under **Controlled by Stowaway** with a countdown to sleep, plus Open, Wake, Sleep now and Edit buttons.
+1. Every container on the server is listed under **Apps on this server**. Click **Let Stowaway manage** on an app.
+2. Check the settings and click **Let Stowaway manage it**:
+   - **Sleep:** put it to sleep *automatically* after a number of idle minutes, or *only when told* (Home Assistant, the API or the Sleep now button).
+   - **Address & opening:** the **link port** is the new address that wakes the app, e.g. `http://192.168.1.2:18096`. Put this in your dashboard or a bookmark. The **app port** is the port the app listens on inside its container; it's filled in for you.
+3. The app moves to the top of the list. Its name is now the link that opens (and wakes) it, and the panel has **Wake** / **Sleep now** and **Settings**.
 
-Untick **Stowaway Enabled** to hand a container back. Stowaway offers to start it if it's asleep so it runs normally again.
+**Settings → Stop managing *app*** hands a container back. Stowaway offers to start it if it's asleep so it runs normally again.
 
 Stowaway never modifies your containers (so OMV's Compose page won't undo anything). The app's own port keeps working while it's awake; only the link port wakes it.
 
+## The app list
+
+One list holds every container: the apps Stowaway manages first, then the rest. **All**, **Managed**, **Not managed** and **Updates** above the list filter it, and the search box finds an app by name, image or compose project. Each app's panel has four columns:
+
+| Column | Shows |
+|---|---|
+| **Sleep** | How it sleeps: *Sleeps after 10 min* or *Sleeps only when told*, *Awake while busy*, its awake hours, and *Kept awake* or *Won't wake when opened* when those are on. Apps Stowaway doesn't manage say *Not managed, always on*. |
+| **Updates** | *Update available* or *Up to date*, and whether auto-update is on (*Auto-update Sun 4:00 AM* at a scheduled restart, *Auto-update when it wakes*, or *Auto-update off*). |
+| **Usage** | The app's CPU (100% = one core) and memory right now. |
+| **Last opened by** | What opened or woke it last, and when: a device (its network name if your router provides one, otherwise its browser and IP address), Home Assistant, another API client, the Wake button or its awake hours. Not tracked for apps Stowaway doesn't manage, since visits don't pass through it. |
+
+The status label next to the name is the same one dashboards get: **In Use**, **Sleeping in 8 min**, **Ready to Sleep**, **Sleeping** and so on (see [Status labels](#dashboards-homarr-homepage-dashy-glance-heimdall)). Apps with companion containers have an arrow that opens a list of them, each with its own status, CPU and memory.
+
+**Settings** on a panel opens the app's settings window with tabs: **Sleep**, **Staying awake**, **Address & opening**, **Companions**, **Updates & restarts**, **Dashboards** and **Home Assistant**. Apps Stowaway doesn't manage have only **Updates & restarts**, since restarts and updates work for any container.
+
+**System Settings** (top right) holds everything that isn't about one app: start page and time zone, Homarr connection, Home Assistant tokens, the macvlan helper, HTTPS, diagnostics and your account.
+
 ## Companion containers
 
-Some apps come with helper containers that are useless on their own, like Tdarr and its `tdarr-node-cpu`, `tdarr-node-intel` and `tdarr-node-nvidia` nodes. Enable Stowaway on the main app only, and under **Companion containers** in its settings tick the helpers. Containers from the same compose project are listed first.
+Some apps come with helper containers that are useless on their own, like Tdarr and its `tdarr-node-cpu`, `tdarr-node-intel` and `tdarr-node-nvidia` nodes. Let Stowaway manage the main app only, and in its **Settings → Companions** tick the helpers. Containers from the same compose project are listed first.
 
 - **Waking:** companions start right after the app wakes.
 - **Sleeping:** they go to sleep with it.
 - **Activity counts:** if a companion is busy (say, a node transcoding), the app stays awake even when its own web interface is idle.
-- **In the container list:** companions show **With tdarr** instead of their own *Enable Stowaway* box.
+- **In the app list:** companions are listed under their app (click the arrow next to its name) instead of on their own.
 
 ## Resources saved
 
@@ -114,50 +131,60 @@ These are estimates. A stopped app uses nothing, so Stowaway learns what each ap
 
 ## Start page, ready delay and error page
 
-**Settings → Start page** controls what visitors see while a sleeping app starts:
+**System Settings → General** controls what visitors see while a sleeping app starts:
 
 - **Style:** Please Wait, Starting Service, Loading *app name*, Ready in 3, 2, 1 (a countdown based on how long the app took last time), or a **Custom message** where `%name%` becomes the app's name.
 - **Ready delay:** seconds to wait after the app answers before opening it. Useful for apps that accept connections a moment before they're fully ready.
 - **Preview start page / Preview error page** show them without touching any container.
 
-Each app can override the style and delay under **Edit → Advanced**.
+Each app can override the style and delay under its **Settings → Address & opening**.
 
 If an app fails to start, the start page turns into an error page showing the reason, with **Try again** and **Open dashboard** buttons.
 
-## Updating apps when they wake
+## Updates
 
-Turn it on per app under **Edit → Updates → Check for a newer version when waking**. When the app is woken, Stowaway asks the image's registry (e.g. Docker Hub) whether the tag it uses, such as `jellyfin/jellyfin:latest`, now points to a newer version. If so:
+**Update checks.** Stowaway asks the image's registry (e.g. Docker Hub) about a newer version of each app it manages once a day, without installing anything, and the app's panel shows **Update available** when there is one. Change how often (or turn it off) under the app's **Settings → Updates & restarts → Update checks**; **Check now** checks straight away. Apps Stowaway doesn't manage can have update checks too: set a number of hours in their Settings.
+
+**Update now** (on the *Update available* banner in that tab) installs it right away: the new version downloads while the app keeps running, then the container is swapped. An app that's asleep is started to check the new version works, then put back to sleep.
+
+**Auto-update** installs new versions without you, in one of two ways:
+- **At its scheduled restart** (see *Scheduled restarts* below), with *Auto-update: install the newest version when it restarts* ticked.
+- **When it wakes**, described next.
+
+### Auto-update when it wakes
+
+Turn it on per app under **Settings → Updates & restarts → Auto-update when it wakes**. When the app is woken, Stowaway asks the image's registry (e.g. Docker Hub) whether the tag it uses, such as `jellyfin/jellyfin:latest`, now points to a newer version. If so:
 
 1. Visitors see an **Updating** page with a progress bar while the new version downloads.
 2. Stowaway swaps the container for one built from the new image, keeping its name, environment, labels, restart policy, ports, volumes (including anonymous ones), networks, IP addresses and MAC address. Settings that came from the old image itself are left to the new image, so its new defaults apply.
 3. The page hands over to your chosen start page and then opens the app.
 
-If the new version won't start, Stowaway puts the previous container back, points the image name back at the working version (so a `docker compose up` doesn't pick up the broken one), shows a note on the app's card, and won't try that version again. **Try again next wake** on the card clears that.
+If the new version won't start, Stowaway puts the previous container back, points the image name back at the working version (so a `docker compose up` doesn't pick up the broken one), shows a note on the app's panel, and won't try that version again. **Try again next time** on the panel clears that.
 
-- **Check at most every** (default 24 hours) limits how often the registry is asked; 0 checks on every wake. **Check now** in the Edit dialog checks without installing.
+- **At most every** (default 24 hours) limits how often the registry is asked when it wakes; 0 checks on every wake.
 - If the registry can't be reached, the app just starts on its current version.
-- Updates on wake only happen while an app is asleep, never while it's running. (Scheduled maintenance, below, can also update apps that are running.)
+- Updates on wake only happen while an app is asleep, never while it's running. (Scheduled restarts and **Update now** can also update apps that are running.)
 - Pinned images (`image@sha256:…`) and images built on the server are never updated.
 - **Private registries:** uncomment the `config.json` line in `docker-compose.yml` so Stowaway can use the server's `docker login`.
 - **Be choosy:** `:latest` can bring big version jumps. For apps where that matters, use a tag like `jellyfin/jellyfin:10.10` so updates stay within that version line, or leave updating off.
 - Docker Hub limits anonymous downloads (checks don't count), so daily checks are fine.
 
-## Scheduled maintenance (restarts and updates)
+## Scheduled restarts
 
-The **Maintenance** tab is separate from sleeping and waking: it lists **every container** on the server, including ones Stowaway doesn't control, and lets you restart them on a schedule. Click **Schedule** on a container:
+Any container, including ones Stowaway doesn't put to sleep, can be restarted on a schedule. Open its **Settings → Updates & restarts → Scheduled restart**:
 
-- **Restart:** every day, every week (pick the day) or every month (pick a date from the 1st to the 28th, or *Last day of the month*), at a time you choose. Monthly is the longest interval. Times use the time zone in **Settings**.
-- **Also update to the newest version:** uses the same update process as *Updating apps when they wake*. The new version downloads while the container keeps running, so it's only down for the swap. Settings, volumes, networks and IP addresses are kept. If the new version doesn't stay up, the previous version is put back and that version isn't tried again (**Allow that version next time** clears this).
-- **If it's busy, wait up to** (default 6 hours): if the container is busy at the scheduled time (CPU or network above the limits in Settings, or someone using it through Stowaway), Stowaway checks again every 10 minutes. If it's still busy when the time runs out, that run is skipped until next time. Set it to 0 to restart regardless.
+- **Restart:** every day, every week (pick the day) or every month (pick a date from the 1st to the 28th, or *Last day of the month*), at a time you choose. Monthly is the longest interval. Times use the time zone in **System Settings → General**.
+- **Auto-update: install the newest version when it restarts:** uses the same update process as *Auto-update when it wakes*. The new version downloads while the container keeps running, so it's only down for the swap. Settings, volumes, networks and IP addresses are kept. If the new version doesn't stay up, the previous version is put back and that version isn't tried again (**Allow that version next time** clears this).
+- **If it's busy, wait up to** (default 6 hours): if the container is busy at the scheduled time (CPU or network above the limits in System Settings, or someone using it through Stowaway), Stowaway checks again every 10 minutes. If it's still busy when the time runs out, that run is skipped until next time. Set it to 0 to restart regardless.
 
 After a restart, Stowaway checks that the container **stays up**. If the container has a Docker health check, it waits up to 5 minutes for *healthy*. Otherwise the container must keep running for 20 seconds without crashing or restarting itself.
 
-Each row shows the schedule, the next run and the result of the last one: **Restarted**, **Updated**, **Rolled back**, **Skipped**, **Missed** or **Failed**, with the reason. **Run now** does it straight away, skipping the busy wait.
+The tab shows the next run and the result of the last one: **Restarted**, **Updated**, **Put back**, **Skipped**, **Missed** or **Failed**, with the reason. **Restart now** does it straight away, skipping the busy wait. On the app list, an app Stowaway doesn't manage shows *Restarts Sun 4:30 AM* under Sleep.
 
 Good to know:
 
 - Jobs run one at a time.
-- A container that isn't running is left alone. The exception is an app asleep under Stowaway with *Also update* on: it's updated, started to check that the new version works, then put back to sleep.
+- A container that isn't running is left alone. The exception is an app asleep under Stowaway with auto-update on: it's updated, started to check that the new version works, then put back to sleep.
 - If Stowaway wasn't running at the scheduled time (for example, the server was off), the job still runs when Stowaway comes back, as long as that's within the busy wait (at least 1 hour). Later than that, it's recorded as **Missed** and waits for the next scheduled time.
 - A new schedule's first run is the next matching time, not right away.
 - Stowaway can't restart itself, so it isn't listed.
@@ -165,7 +192,7 @@ Good to know:
 
 ## HTTPS
 
-Turn it on in **Settings → HTTPS**. Stowaway then serves every enabled app over HTTPS on one port (default 8443), each under its own name: with the domain `myhome.duckdns.org`, Jellyfin is at `https://jellyfin.myhome.duckdns.org:8443` and the dashboard at `https://stowaway.myhome.duckdns.org:8443`. The plain HTTP link ports keep working alongside.
+Turn it on in **System Settings → HTTPS & access**. Stowaway then serves every enabled app over HTTPS on one port (default 8443), each under its own name: with the domain `myhome.duckdns.org`, Jellyfin is at `https://jellyfin.myhome.duckdns.org:8443` and the dashboard at `https://stowaway.myhome.duckdns.org:8443`. The plain HTTP link ports keep working alongside.
 
 Choose where the certificate comes from:
 
@@ -182,7 +209,7 @@ Click **Save and get certificate** and watch the status box. Tick **Test certifi
 ### DuckDNS step by step
 
 1. Sign in at [duckdns.org](https://www.duckdns.org), add a name such as `myhome`, and make sure it shows your home's public IP.
-2. In Stowaway's Settings: tick **Serve apps over HTTPS**, domain `myhome.duckdns.org`, certificate **Let's Encrypt with DuckDNS**, paste the token from the top of the DuckDNS page, and click **Save and get certificate**. It takes about a minute.
+2. In Stowaway's System Settings → HTTPS & access: tick **Serve apps over HTTPS**, domain `myhome.duckdns.org`, certificate **Let's Encrypt with DuckDNS**, paste the token from the top of the DuckDNS page, and click **Save and get certificate**. It takes about a minute.
 3. **From outside your home:** forward a port on your router to the server's HTTPS port. Using the same number on both sides (e.g. 8443 → 192.168.1.2:8443) keeps the links in the dashboard correct everywhere. If port 443 is free on the server, set the HTTPS port to 443 and forward 443 → 443 for links without a port.
 4. **At home:** `*.myhome.duckdns.org` points to your public IP, which works if your router supports "NAT loopback". If it doesn't, add a local DNS entry (router, Pi-hole or AdGuard) pointing `*.myhome.duckdns.org` to `192.168.1.2`.
 
@@ -195,11 +222,11 @@ Click **Save and get certificate** and watch the status box. Tick **Test certifi
 
 ## Busy apps, Keep awake and awake hours
 
-**Busy detection.** Before putting an app to sleep, Stowaway checks its CPU and network use every few seconds. While either is above the threshold (default 5% CPU or 50 KB/s), the app counts as busy and its countdown restarts. This covers transcoding, library scans, downloads, and people using the app through its own port instead of the link. The card shows **Busy** with the reason, plus live CPU and network figures. Change the defaults in **Settings**, or per app under **Edit → Stay awake while busy** (untick it to ignore activity for that app). CPU is measured like `docker stats`: 100% = one full core. Network use can't be measured for containers on the host network.
+**Busy detection.** Before putting an app to sleep, Stowaway checks its CPU and network use every few seconds. While either is above the threshold (default 5% CPU or 50 KB/s), the app counts as busy and its countdown restarts. This covers transcoding, library scans, downloads, and people using the app through its own port instead of the link. The app shows **In Use** while it's busy. Change the defaults in **System Settings → General**, or per app under **Settings → Staying awake → Awake while busy** (untick it to ignore activity for that app). CPU is measured like `docker stats`: 100% = one full core. Network use can't be measured for containers on the host network.
 
-**Keep awake.** The **Keep awake** button on a card holds the app awake for 1, 4 or 12 hours, or until you click **Release**. If it's asleep, it's woken. This survives Stowaway restarts.
+**Keep awake.** **Settings → Sleep → Keep awake** holds the app awake for 1, 4 or 12 hours, or until you release it (**Release** on its panel or in that tab). If it's asleep, it's woken. This survives Stowaway restarts.
 
-**Awake hours.** Under **Edit → Awake hours**, pick days and a time range (e.g. Mon–Fri 18:00–23:00; ranges past midnight work). Stowaway starts the app when the range begins and keeps it awake until it ends, then the normal idle countdown takes over. Times use the time zone in **Settings**.
+**Awake hours.** Under **Settings → Staying awake → Awake hours**, pick days and a time range (e.g. Mon–Fri 18:00–23:00; ranges past midnight work). Stowaway starts the app when the range begins and keeps it awake until it ends, then the normal idle countdown takes over. Times use the time zone in **System Settings → General**.
 
 **Sleep now** always wins: it ends a Keep awake and skips the rest of the current awake hours.
 
@@ -218,8 +245,8 @@ Linux blocks a server from talking to its own macvlan (and ipvlan) containers, s
 Otherwise Stowaway sets up a small helper by itself; you only pick its address:
 
 1. Make sure `cap_add: - NET_ADMIN` is uncommented in `docker-compose.yml` (it's commented out by default, since only macvlan setups need it), then run `docker compose up -d`.
-2. Open **Settings** and fill in **Macvlan helper IP**: a free address on your network, outside your router's DHCP range and not used by any device or container (e.g. `192.168.1.250`). Or set it in `docker-compose.yml` with `MACVLAN_HELPER_IP=192.168.1.250`, which then takes precedence and locks the Settings field.
-3. Save. Any controlled macvlan container with a warning on its card should clear.
+2. Open **System Settings → Network** and fill in **Macvlan helper IP**: a free address on your network, outside your router's DHCP range and not used by any device or container (e.g. `192.168.1.250`). Or set it in `docker-compose.yml` with `MACVLAN_HELPER_IP=192.168.1.250`, which then takes precedence and locks the field.
+3. Save. Any managed macvlan app with a warning on its panel should clear.
 
 The helper is a macvlan interface (ipvlan for ipvlan networks) named `sw-<network card>` with a route to each running macvlan container's IP. That includes containers Stowaway doesn't manage, so a dashboard on macvlan (Homarr, Homepage…) can reach Stowaway at the helper address for its status checks. Stowaway sets the helper and the network card it sits on to answer ARP only for their own addresses (`arp_ignore=1`, `arp_announce=2`); without that, the helper would also answer for the server's IP, which security software such as ESET reports as ARP spoofing. It's removed when the server reboots and rebuilt when Stowaway starts. This is why macvlan setups need `cap_add: NET_ADMIN` in the compose file.
 
@@ -270,7 +297,7 @@ In every case, use the ready-made image compose from [Install](#install) with th
 
 ## Dashboards: Homarr, Homepage, Dashy, Glance, Heimdall
 
-Use each app's link port as the tile's URL; clicking it wakes the app. Click **Integrations** at the top of the dashboard, pick an app and a dashboard, and copy the ready-made settings. In short:
+Use each app's link port as the tile's URL; clicking it wakes the app. An app's **Settings → Dashboards** tab adds it to your dashboard with one click, or shows the ready-made settings to copy (**Set it up by hand**). In short:
 
 | Address | What it gives |
 |---|---|
@@ -292,27 +319,27 @@ Use each app's link port as the tile's URL; clicking it wakes the app. Click **I
 
 The status JSON carries it as `indicator`, `indicator_color` (a colour name), `indicator_hex` and `indicator_icon` (a Tabler icon name), so any dashboard or script can show the same thing.
 
-- **Homarr:** the app tile's *Ping URL* is the `?code=1` address (green/red dot). For the label, import the **Stowaway status** custom widget once (download it from **Integrations → Homarr**, then *Manage → Custom widgets → Import*), add it to a board and set **App name**. It shows the label in colour, with a bar counting down to sleep.
+- **Homarr:** the app tile's *Ping URL* is the `?code=1` address (green/red dot). For the label, import the **Stowaway status** custom widget once (**Download widget** in an app's Dashboards tab or in System Settings → Dashboards, then *Manage → Custom widgets → Import*), add it to a board and set **App name**. It shows the label in colour, with a bar counting down to sleep.
 - **Homepage:** `siteMonitor` with the `?code=1` address (green/red), plus a `customapi` widget showing the label. It refreshes every 15 seconds, so the countdown keeps up.
 - **Dashy:** `statusCheckUrl` with the `?code=1` address. Dashy can only show a dot: green while awake, red while asleep.
 - **Glance:** a `monitor` widget with `check-url` (green/red), and a `custom-api` widget listing every app with its label in colour. Glance updates it when the page is loaded.
-- **Heimdall:** has no status dot for ordinary tiles. The **Stowaway** tile type shows the label in colour instead and refreshes itself. In **Integrations → Heimdall**, **Add *app* to Heimdall** creates the tile with the app's own icon (from the [dashboard-icons](https://github.com/homarr-labs/dashboard-icons) collection), its Stowaway link and the status switched on; if you already have a tile for the app, that one is converted and keeps its title and icon. Works with the linuxserver Heimdall image; by hand, see `heimdall/README.md`. Clicking **Add *app* to Heimdall** also updates the tile type in Heimdall after a Stowaway update.
+- **Heimdall:** has no status dot for ordinary tiles. The **Stowaway** tile type shows the label in colour instead and refreshes itself. In an app's **Settings → Dashboards**, **Add to Heimdall** creates the tile with the app's own icon (from the [dashboard-icons](https://github.com/homarr-labs/dashboard-icons) collection), its Stowaway link and the status switched on; if you already have a tile for the app, that one is converted and keeps its title and icon. Works with the linuxserver Heimdall image; by hand, see `heimdall/README.md`. Clicking **Add to Heimdall** (or **Update tile**) also updates the tile type in Heimdall after a Stowaway update.
 
-**Let Stowaway set it up.** Nothing changes in a dashboard until you click its button in the Integrations window.
+**Let Stowaway set it up.** Nothing changes in a dashboard until you click its button in an app's **Settings → Dashboards**. The tab also shows which dashboards the app is already on.
 
-- **Homarr:** save Homarr's address and an API key once under **Settings → Homarr** (create the key in Homarr under *Manage → Tools → API* as an admin; Homarr 1.0+). Then pick an app in **Integrations → Homarr** and click **Add *app* to Homarr**. If Homarr already has that app, it's updated instead: its name and icon are kept, and its link and Ping URL are set. New apps land in Homarr's app list; place them on a board with an App widget. The key stays on the Stowaway server and isn't shown again or included in diagnostic reports.
-- **Homepage:** writes a group with your apps to `services.yaml`, between two marker comments. Only that block is ever rewritten; the rest of the file stays as it is, and the first time your original is saved as `services.yaml.before-stowaway`.
-- **Glance:** writes `stowaway.yml` next to `glance.yml` (a status monitor for your apps plus a list of all apps). Add it to a page once with `- $include: stowaway.yml` in a column's `widgets:`; after that Glance reloads it by itself.
+- **Homarr:** save Homarr's address and an API key once under **System Settings → Dashboards** (create the key in Homarr under *Manage → Tools → API* as an admin; Homarr 1.0+). Then click **Add to Homarr** in an app's Dashboards tab. If Homarr already has that app, it's updated instead: its name and icon are kept, and its link and Ping URL are set. New apps land in Homarr's app list; place them on a board with an App widget. The key stays on the Stowaway server and isn't shown again or included in diagnostic reports.
+- **Homepage:** writes a *Stowaway* group with the apps you've added to `services.yaml`, between two marker comments. Adding another app rewrites the group with it included. Only that block is ever rewritten; the rest of the file stays as it is, and the first time your original is saved as `services.yaml.before-stowaway`.
+- **Glance:** writes `stowaway.yml` next to `glance.yml` (a status monitor for the apps you've added plus a list of all apps). Add it to a page once with `- $include: stowaway.yml` in a column's `widgets:`; after that Glance reloads it by itself.
 
-**Dashboard on a macvlan network?** It can't reach the server's own address, so its status checks fail ("fetch failed"). Use the macvlan helper IP instead, e.g. `http://192.168.1.60:8880/_stowaway/status/<app>?code=1`. Stowaway gives every container on a macvlan network a route through the helper once a helper IP is set, and the Integrations window fills in the helper address for you when it sees your dashboard on macvlan. Tile links you click keep using the usual address.
+**Dashboard on a macvlan network?** It can't reach the server's own address, so its status checks fail ("fetch failed"). Use the macvlan helper IP instead, e.g. `http://192.168.1.60:8880/_stowaway/status/<app>?code=1`. Stowaway gives every container on a macvlan network a route through the helper once a helper IP is set, and the Dashboards tab fills in the helper address for you when it sees your dashboard on macvlan. Tile links you click keep using the usual address.
 
-Containers that only have a restart schedule (Maintenance tab) can be shown too: their status address gives running/stopped and the next restart.
+Containers that only have a restart schedule can be shown too: their status address gives running/stopped and the next restart.
 
-If a dashboard pings the app's link directly instead, add its user agent (e.g. `Homarr`) or IP address under **Settings → Dashboard status checks**. Those requests never wake an app or reset its timer.
+If a dashboard pings the app's link directly instead, add its user agent (e.g. `Homarr`) or IP address under **System Settings → Dashboards → Dashboard status checks**. Those requests never wake an app or reset its timer.
 
 ## Home Assistant
 
-**Apps only Home Assistant should control.** When enabling an app, set **Put it to sleep** to *Only when I say so*. Stowaway then never puts it to sleep by itself: Home Assistant (for example when nobody is home), the API, scheduled maintenance or **Sleep now** decide. The link port is optional in this mode; without one, the app is woken from Home Assistant or the dashboard rather than by opening a link.
+**Apps only Home Assistant should control.** In the app's **Settings → Sleep**, choose *Only when told*. Stowaway then never puts it to sleep by itself: Home Assistant (for example when nobody is home), the API, a scheduled restart or **Sleep now** decide. The link port is optional in this mode; without one, the app is woken from Home Assistant or the dashboard rather than by opening a link.
 
 The **Stowaway** integration for Home Assistant lives in its own repository (`stowaway-homeassistant`), installed through HACS. Each app gets:
 - an **Awake** switch;
@@ -323,7 +350,7 @@ The **Stowaway** integration for Home Assistant lives in its own repository (`st
 
 It also adds actions to keep an app awake or put it to sleep (optionally switching waking off).
 
-Setup: **Integrations → Home Assistant → Create token** in Stowaway, then add the integration in Home Assistant with Stowaway's address and the token. Without HACS, the same tab has copy-paste REST switch/sensor configuration.
+Setup: **System Settings → Home Assistant → Create token** in Stowaway, then add the integration in Home Assistant with Stowaway's address and the token. Each app's **Settings → Home Assistant** tab lists what Home Assistant gets for it, and has copy-paste REST switch/sensor configuration for use without HACS.
 
 **Away from home.** An automation can put media servers to sleep when everyone leaves (`zone.home` drops to 0). You then choose what happens if someone connects while you're away:
 - **Sleep only:** Stowaway wakes the app as usual, so remote streaming still works.
@@ -334,12 +361,12 @@ Setup: **Integrations → Home Assistant → Create token** in Stowaway, then ad
 An app can be switched off: it sleeps, and visitors can't wake it.
 - **What visitors see:** browsers get a "switched off" page that opens the app by itself once it's switched back on. Apps and API clients get HTTP 503.
 - **What else is paused:** awake hours and scheduled updates of a sleeping app are paused too.
-- **How to switch it off:** from Home Assistant, the API, or **Keep awake → Sleep, and don't wake until I allow it**.
-- **How to switch it back on:** **Allow waking** on the card. **Wake** and **Keep awake** in the dashboard also switch it back on.
+- **How to switch it off:** from Home Assistant, the API, or tick **Don't wake it when its link is opened** in the app's **Settings → Sleep**. The panel then shows *Won't wake when opened*.
+- **How to switch it back on:** untick it again. **Wake** and **Keep awake** in the dashboard also switch it back on.
 
 ## API
 
-Home Assistant and scripts use API tokens (**Integrations → Home Assistant → API tokens**). Requests send `Authorization: Bearer <token>`.
+Home Assistant and scripts use API tokens (**System Settings → Home Assistant → API tokens**). Requests send `Authorization: Bearer <token>`.
 
 A token can see and control apps, but can't change settings, the account or tokens. It works only from the home network unless the dashboard is allowed from outside. Tokens are stored hashed in `config/tokens.json`, and resetting the password doesn't remove them; revoke them in the dashboard.
 
@@ -353,7 +380,7 @@ A token can see and control apps, but can't change settings, the account or toke
 | `POST …/apps/<app>/block` `{"on": true}` | Switch waking off (`false`: back on) |
 | `POST …/apps/<app>/power` `{"on": false}` | Wake or sleep in one endpoint (for Home Assistant's REST switch) |
 | `POST …/apps/<app>/keep-awake` `{"minutes": 60}` | Keep awake; `{"forever": true}`, or `{}` to release |
-| `POST …/apps/<app>/restart` | Run its maintenance now |
+| `POST …/apps/<app>/restart` | Restart it now (with its update setting) |
 
 ## Behavior notes
 
@@ -361,7 +388,7 @@ A token can see and control apps, but can't change settings, the account or toke
 - API clients and non-GET requests wait until the app is ready (up to 60s), then go through.
 - An app is never stopped while a request is still in progress, so long downloads aren't cut off.
 - **Your browser stays on Stowaway's address** (the link) while you use an app. That's how Stowaway sees the app is in use, and it's why the link can wake the app later. If an app redirects to its own IP and port, Stowaway points the redirect back at the link.
-- **Go to the app's own address** (Edit → Advanced → When opened) is available for apps that misbehave behind Stowaway: after waking, browsers are sent to the app's own IP and port, while apps and API clients keep using the link. Stowaway then only knows the app is in use from its CPU and network activity, so keep *Stay awake while busy* on. It needs an address the browser can reach: a macvlan IP, a published port, or host networking.
+- **Go to the app's own address** (Settings → Address & opening → When opened) is available for apps that misbehave behind Stowaway: after waking, browsers are sent to the app's own IP and port, while apps and API clients keep using the link. Stowaway then only knows the app is in use from its CPU and network activity, so keep *Stay awake while busy* on. It needs an address the browser can reach: a macvlan IP, a published port, or host networking.
 - **Live connections (WebSockets) are passed through**, so browser-based desktops (HandBrake and other noVNC apps), Home Assistant and code-server work through the link. An open live connection counts as the app being in use, so leaving such a tab open keeps the app awake; close the tab (or click **Sleep now**) to let it sleep.
 - Starting or stopping a container outside Stowaway (Portainer, the command line, your NAS's Docker page) shows up in the dashboard right away.
 - After a server reboot, apps that Docker starts on its own are put back to sleep once their idle time passes.
@@ -369,7 +396,7 @@ A token can see and control apps, but can't change settings, the account or toke
 
 ## Diagnostics and reporting problems
 
-**Settings → Diagnostics** helps when something isn't working:
+**System Settings → Diagnostics** helps when something isn't working:
 
 - **Detailed logging** records each decision Stowaway makes: every request and whether it woke an app, Docker events, CPU/network samples, and network-helper commands. It switches itself off after 24 hours. Turn it on, make the problem happen again, then get the report.
 - **View report / Download report** gives a snapshot: Stowaway and Docker versions, your NAS's system, settings, each app's state and recent errors, scheduled maintenance results, containers and networks, the macvlan helper, the certificate status and the recent log. The download is a zip with the report and the log files.
@@ -393,8 +420,9 @@ Logs are also kept in `config/logs/` (up to about 3 MB, readable only by root), 
 | `STOWAWAY_DEMO` | unset | `1` runs with fake containers, no Docker needed |
 | `STOWAWAY_SELF` | `stowaway` | Stowaway's own container name, so it doesn't list itself |
 | `LOG_LEVEL` | `INFO` | `DEBUG` keeps detailed logging on permanently |
-| `MACVLAN_HELPER_IP` | empty | Address for the macvlan helper; overrides Settings → Macvlan |
+| `MACVLAN_HELPER_IP` | empty | Address for the macvlan helper; overrides System Settings → Network |
 | `STATS_INTERVAL` | `15` | Seconds between CPU/network samples of awake apps (busy detection) |
+| `USAGE_INTERVAL` | `20` | Seconds between CPU/memory samples of the other running containers, for the app list |
 | `DOCKER_HOST` | local socket | Another way to reach Docker, e.g. `tcp://socket-proxy:2375` |
 
 ## Security
