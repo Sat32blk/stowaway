@@ -46,8 +46,30 @@ def status_urls(base: str, name: str):
 
 
 # ---------------------------------------------------------------- Homepage --
-def homepage_block(group: str, items: list[dict], base: str) -> str:
-    services = []
+STOWAWAY_ICON = "https://raw.githubusercontent.com/Sat32blk/Stowaway/main/docs/icon.png"
+SUMMARY_MAPPINGS = {
+    "awake": [{"field": "awake", "label": "Awake"}, {"field": "asleep", "label": "Asleep"}],
+    "memory": [{"field": "memory_freed", "label": "Mem freed"}],
+    "cpu": [{"field": "cpu_freed", "label": "CPU freed"}],
+    "cpu_time": [{"field": "cpu_time_saved", "label": "Saved (7 days)"}],
+    "updates": [{"field": "updates_waiting", "label": "Updates"}],
+}
+
+
+def homepage_self(base: str, link: str, fields: list[str]) -> dict:
+    """Homepage service entry for Stowaway itself."""
+    mappings = [m for f in fields for m in SUMMARY_MAPPINGS.get(f, [])][:4]   # Homepage shows up to 4
+    return {"Stowaway": {
+        "href": link,
+        "icon": STOWAWAY_ICON,
+        "description": "Wakes apps when opened",
+        "siteMonitor": f"{base}/summary",
+        "widget": {"type": "customapi", "url": f"{base}/summary", "refreshInterval": 30000, "mappings": mappings},
+    }}
+
+
+def homepage_block(group: str, items: list[dict], base: str, self_entry: dict | None = None) -> str:
+    services = [self_entry] if self_entry else []
     for it in items:
         st, dot = status_urls(base, it["name"])
         services.append({it["name"]: {
@@ -97,6 +119,19 @@ def merge_services(text: str, block: str) -> str:
 # ------------------------------------------------------------------ Glance --
 GLANCE_COLORS = {"green": "hsl(134, 50%, 60%)", "yellow": "hsl(45, 95%, 55%)", "orange": "hsl(27, 98%, 58%)",
                  "teal": "hsl(162, 75%, 45%)", "blue": "hsl(207, 90%, 63%)", "red": "hsl(0, 94%, 65%)"}
+GLANCE_SUMMARY_TEMPLATE = """<div class="flex gap-20 items-end">
+{{ if .JSON.Bool "show.awake" }}  <div><div class="color-highlight size-h1">{{ .JSON.Int "awake" }}</div><div class="size-h6 color-positive">AWAKE</div></div>
+  <div><div class="color-highlight size-h1">{{ .JSON.Int "asleep" }}</div><div class="size-h6">ASLEEP</div></div>
+{{ end }}{{ if .JSON.Bool "show.memory" }}  <div><div class="color-highlight size-h1">{{ .JSON.String "memory_freed" }}</div><div class="size-h6">FREED</div></div>
+{{ end }}</div>
+<ul class="list list-gap-10" style="margin-top: 12px">
+{{ if .JSON.Bool "show.memory" }}  <li class="flex justify-between"><span>Memory freed</span><span class="color-highlight">{{ .JSON.String "memory_share_text" }}</span></li>
+{{ end }}{{ if .JSON.Bool "show.cpu" }}  <li class="flex justify-between"><span>CPU freed</span><span class="color-highlight">{{ .JSON.String "cpu_freed" }}</span></li>
+{{ end }}{{ if .JSON.Bool "show.cpu_time" }}  <li class="flex justify-between"><span>CPU time saved this week</span><span class="color-highlight">{{ .JSON.String "cpu_time_saved" }}</span></li>
+{{ end }}{{ if .JSON.Bool "show.updates" }}  <li class="flex justify-between"><span>Updates waiting</span><span class="color-highlight">{{ .JSON.Int "updates_waiting" }}</span></li>
+{{ end }}</ul>
+"""
+
 GLANCE_TEMPLATE = """<ul class="list list-gap-10 collapsible-container" data-collapse-after="8">
 {{ range .JSON.Array "apps" }}
   <li class="flex justify-between items-center gap-10"><span class="color-highlight">{{ .String "name" }}</span>
@@ -109,19 +144,30 @@ GLANCE_TEMPLATE = """<ul class="list list-gap-10 collapsible-container" data-col
 """
 
 
-def glance_file(items: list[dict], base: str, title: str) -> str:
+def glance_file(items: list[dict], base: str, title: str, with_self: bool = False) -> str:
     sites = []
     for it in items:
         _, dot = status_urls(base, it["name"])
         sites.append({"title": it["name"], "url": it["link"], "check-url": dot, "icon": f"di:{it['icon']}"})
-    widgets = [
-        {"type": "monitor", "title": title, "cache": "1m", "sites": sites},
-        {"type": "custom-api", "title": "Stowaway", "url": f"{base}/status", "cache": "30s",
-         "template": GLANCE_TEMPLATE},
-    ]
+    widgets = []
+    if with_self:
+        widgets.append({"type": "custom-api", "title": "Stowaway", "url": f"{base}/summary", "cache": "1m",
+                        "template": GLANCE_SUMMARY_TEMPLATE})
+    if sites:
+        widgets.append({"type": "monitor", "title": title, "cache": "1m", "sites": sites})
+    widgets.append({"type": "custom-api", "title": "Apps" if with_self else "Stowaway", "url": f"{base}/status",
+                    "cache": "30s", "template": GLANCE_TEMPLATE})
     head = ("# Written by Stowaway (an app's Settings > Dashboards > Glance). Clicking the button there again replaces this file.\n"
             "# Use it in glance.yml with a line like:  - $include: stowaway.yml  (inside a column's widgets)\n")
-    return head + yaml.safe_dump(widgets, sort_keys=False, allow_unicode=True, width=1000)
+    return head + yaml.dump(widgets, Dumper=_BlockDumper, sort_keys=False, allow_unicode=True, width=1000)
+
+
+class _BlockDumper(yaml.SafeDumper):
+    """Writes multi-line text (Glance templates) as readable | blocks."""
+
+
+_BlockDumper.add_representer(str, lambda d, v: d.represent_scalar(
+    "tag:yaml.org,2002:str", v, style="|" if "\n" in v else None))
 
 
 def glance_includes(text: str) -> bool:
@@ -205,6 +251,31 @@ def homarr_widget(base: str) -> dict:
                       "control": "text", "default": ""},
         },
         "template": HOMARR_WIDGET_TEMPLATE,
+    }
+
+
+HOMARR_SUMMARY_TEMPLATE = """<Stack gap="sm" p="sm" h="100%" style={{ minWidth: 0 }}>
+  <Group justify="space-between" wrap="nowrap" gap="xs"><Text fw={700} truncate>{options.title || "Stowaway"}</Text><Group gap={4} wrap="nowrap">{data.summary && data.summary.show?.updates && data.summary.updates_waiting > 0 ? <Badge color="yellow" variant="light">{data.summary.updates_waiting + " updates"}</Badge> : null}{data.summary ? <Badge color={data.summary.awake > 0 ? "green" : "gray"} variant="light">{data.summary.awake + " awake"}</Badge> : null}<RefreshButton requestId="summary" label="Refresh" size="xs" /></Group></Group>
+  {status.summary?.loading && !data.summary ? <Skeleton height={70} radius="md" /> : status.summary?.ok === false ? <Text size="sm" c="red">Can't reach Stowaway</Text> : options.layout === "wide" ? <Stack gap="sm"><SimpleGrid cols={4} spacing="sm">{data.summary.show?.awake ? <Paper withBorder p="xs" radius="md"><Text size="xs" c="dimmed">Awake</Text><Text fw={700} size="xl" c="green">{data.summary.awake}</Text><Text size="xs" c="dimmed">{"of " + data.summary.apps + " apps"}</Text></Paper> : null}{data.summary.show?.awake ? <Paper withBorder p="xs" radius="md"><Text size="xs" c="dimmed">Asleep</Text><Text fw={700} size="xl">{data.summary.asleep}</Text><Text size="xs" c="dimmed">{"of " + data.summary.apps + " apps"}</Text></Paper> : null}{data.summary.show?.memory ? <Paper withBorder p="xs" radius="md"><Text size="xs" c="dimmed">Memory freed</Text><Text fw={700} size="xl">{data.summary.memory_freed}</Text><Text size="xs" c="dimmed">right now</Text></Paper> : null}{data.summary.show?.cpu ? <Paper withBorder p="xs" radius="md"><Text size="xs" c="dimmed">CPU freed</Text><Text fw={700} size="xl">{data.summary.cpu_freed}</Text><Text size="xs" c="dimmed">of the whole CPU</Text></Paper> : null}{data.summary.show?.cpu_time ? <Paper withBorder p="xs" radius="md"><Text size="xs" c="dimmed">CPU time saved</Text><Text fw={700} size="xl">{data.summary.cpu_time_saved}</Text><Text size="xs" c="dimmed">this week</Text></Paper> : null}</SimpleGrid>{data.summary.show?.memory && data.summary.memory_share != null ? <Group gap="xs" wrap="nowrap"><Text size="xs" c="dimmed">Memory freed</Text><Progress value={Math.min(100, data.summary.memory_share * 100)} color="teal" size="sm" radius="xl" style={{ flex: 1 }} /><Text size="xs">{data.summary.memory_share_text}</Text></Group> : null}</Stack> : <Stack gap="xs">{data.summary.show?.awake ? <Stack gap={4}><Progress value={data.summary.apps ? data.summary.awake * 100 / data.summary.apps : 0} color="green" size="md" radius="xl" /><Group justify="space-between" wrap="nowrap"><Text size="xs" c="dimmed">{data.summary.awake + " awake"}</Text><Text size="xs" c="dimmed">{data.summary.asleep + " asleep"}</Text></Group></Stack> : null}<SimpleGrid cols={2} spacing="sm">{data.summary.show?.memory ? <Stack gap={0}><Text fw={700} size="lg">{data.summary.memory_freed}</Text><Text size="xs" c="dimmed">memory freed</Text></Stack> : null}{data.summary.show?.cpu ? <Stack gap={0}><Text fw={700} size="lg">{data.summary.cpu_freed}</Text><Text size="xs" c="dimmed">CPU freed</Text></Stack> : null}{data.summary.show?.cpu_time ? <Stack gap={0}><Text fw={700} size="lg">{data.summary.cpu_time_saved}</Text><Text size="xs" c="dimmed">saved this week</Text></Stack> : null}</SimpleGrid></Stack>}
+</Stack>"""
+
+
+def homarr_summary_widget(base: str) -> dict:
+    """A Homarr custom widget ("Stowaway summary") for Stowaway itself: apps awake and
+    asleep, and what sleeping them frees. Small or wide, picked in its settings."""
+    w = homarr_widget(base)
+    return {
+        **w,
+        "name": "Stowaway summary",
+        "description": "How many apps Stowaway has awake and asleep, and how much memory and CPU sleeping them frees.",
+        "requests": {"summary": {"path": "/summary", "cacheSeconds": 20}},
+        "options": {
+            "layout": {"label": "Layout", "description": "Small fits a 2×2 space, wide a 4×2 one",
+                       "control": "select", "default": "small",
+                       "choices": [{"label": "Small", "value": "small"}, {"label": "Wide", "value": "wide"}]},
+            "title": {"label": "Title", "description": "Leave empty for \"Stowaway\"", "control": "text", "default": ""},
+        },
+        "template": HOMARR_SUMMARY_TEMPLATE,
     }
 
 

@@ -450,7 +450,7 @@ dialog.big form { padding: 0; gap: 0; display: flex; flex-direction: column; hei
 .pane-h h3 { margin: 0; font-size: 18px; }
 .pane-h .hint { margin: 0; }
 .panes > .section { border-top: 0; padding-top: 0; }
-.panes > .section + .section { border-top: 1px solid var(--soft); padding-top: 16px; }
+.panes > .section:not([hidden]) ~ .section:not([hidden]) { border-top: 1px solid var(--soft); padding-top: 16px; }
 .box { border: 1px solid var(--soft); border-radius: 14px; padding: 16px; display: grid; gap: 12px; background: color-mix(in srgb, var(--muted) 5%, transparent); }
 .box h4 { margin: 0; font-size: 14px; }
 .dlg-foot { display: flex; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--soft); flex-wrap: wrap; align-items: center; }
@@ -496,6 +496,20 @@ label.short { max-width: 300px; }
   .dlg-foot #release { order: 5; flex-basis: 100%; }
   .dlg-foot { padding: 12px 16px; }
 }
+.selfgrid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 14px; align-items: start; }
+.selfgrid .checkline small { margin-left: auto; }
+.selfprev { border-radius: 14px; padding: 16px; display: grid; gap: 12px; background: #1a1b1e; color: #c1c2c5; border: 1px solid #2c2e33; }
+.selfprev .ph { display: flex; align-items: center; gap: 10px; }
+.selfprev .ph svg { width: 30px; height: 30px; border-radius: 7px; flex: none; }
+.selfprev .ph b { color: #e9ecef; }
+.selfprev .ph .aw { margin-left: auto; color: #40c057; font-size: 12px; font-weight: 700; }
+.selfprev .pbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: #2c2e33; }
+.selfprev .pbar i { background: #40c057; display: block; }
+.selfprev .pstats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.selfprev .pstats div { display: grid; }
+.selfprev .pstats b { color: #e9ecef; font-size: 18px; }
+.selfprev .pstats span { font-size: 12px; color: #909296; }
+@media (max-width: 720px) { .selfgrid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -856,6 +870,26 @@ label.short { max-width: 300px; }
       </div>
       <label class="checkline"><input type="checkbox" name="lan_only"> Only allow this dashboard from my home network</label>
       <p class="hint" id="lanHint" style="margin:0"></p>
+    </div>
+    <div class="section" data-p="dash" id="selfSection">
+      <h3>Stowaway on your dashboard</h3>
+      <p class="hint" style="margin:0">A tile for Stowaway itself: how many apps are awake and asleep, and how much memory and CPU sleeping them frees. Each app's own status is added from its <b>Settings → Dashboards</b>.</p>
+      <div class="selfgrid">
+        <div class="box">
+          <h4>What the tile shows</h4>
+          <label class="checkline"><input type="checkbox" name="sum_awake"> Apps awake and asleep <small data-ex="awake"></small></label>
+          <label class="checkline"><input type="checkbox" name="sum_memory"> Memory freed now <small data-ex="memory"></small></label>
+          <label class="checkline"><input type="checkbox" name="sum_cpu"> CPU freed now <small data-ex="cpu"></small></label>
+          <label class="checkline"><input type="checkbox" name="sum_cpu_time"> CPU time saved, last 7 days <small data-ex="cpu_time"></small></label>
+          <label class="checkline"><input type="checkbox" name="sum_updates"> Updates waiting <small data-ex="updates"></small></label>
+          <p class="hint" style="margin:0">Homarr, Glance and Heimdall follow these by themselves once you click Save. Homepage: click <b>Update Homepage</b> below afterwards.</p>
+        </div>
+        <div class="selfprev" id="selfPreview" aria-label="Preview"></div>
+      </div>
+      <div class="dlist" id="selfList"></div>
+      <div id="selfMsg" class="hint" style="margin:0"></div>
+      <div class="addr"><span class="hint" style="margin:0">Summary address, for any other dashboard (JSON, never wakes anything)</span><div class="line"><input readonly id="selfAddr" aria-label="Summary address"><button type="button" id="selfAddrCopy">Copy</button></div></div>
+      <details id="selfManual"><summary>Dashy and others: set it up by hand</summary><div id="selfManualBody" style="display:grid;gap:10px;margin-top:10px"></div></details>
     </div>
     <div class="section" data-p="dash">
       <h3>Dashboard status checks</h3>
@@ -1730,6 +1764,7 @@ async function openSettings(tab = 'general') {
   $('statusEx').textContent = `${location.origin}${location.pathname.replace(/\/$/, '')}/status/NAME`;
   try {
     const st = await api('/settings');
+    settingsCache = st;
     $('setForm').uas.value = st.ignore_user_agents.join('\n');
     $('setForm').ips.value = st.ignore_ips.join('\n');
     $('setForm').shim.value = st.macvlan_shim_ip || '';
@@ -1782,6 +1817,7 @@ async function openSettings(tab = 'general') {
   $('tokNew').innerHTML = '';
   loadTokens();
   $('haAddr').textContent = location.host;
+  loadSelf(settingsCache);
   $('homarrWidget').href = `${API}/homarr/widget?base=${encodeURIComponent(sbFor('homarr'))}`;
   if (!$('setDlg').open) $('setDlg').showModal();
 }
@@ -1813,7 +1849,7 @@ async function saveSettings() {
       duckdns_token: t.duckdns_token.value.trim() || null, cloudflare_token: t.cloudflare_token.value.trim() || null,
       homarr_url: t.homarr_url.value.trim(), homarr_key: t.homarr_key.value.trim() || null,
       http_challenge_port: Number(t.http_challenge_port.value || 8480),
-      admin_lan_only: t.lan_only.checked }) });
+      admin_lan_only: t.lan_only.checked, summary_fields: readSummaryFields() }) });
     await loadSettings();
     refresh();
     return true;
@@ -2366,6 +2402,132 @@ $('tokCreate').onclick = async () => {
     loadTokens();
   } catch (err) { $('setErr').textContent = err.message; }
 };
+/* ---------- Stowaway on your dashboard (System Settings) ---------- */
+const SUM_FIELDS = ['awake', 'memory', 'cpu', 'cpu_time', 'updates'];
+let selfSum = null;
+const SELF_LINK = BASE;
+function readSummaryFields() { return SUM_FIELDS.filter(f => $('setForm')['sum_' + f].checked); }
+function renderSelfPreview() {
+  const d = selfSum, f = readSummaryFields();
+  if (!d) { $('selfPreview').innerHTML = '<span class="hint" style="margin:0">Loading…</span>'; return; }
+  const ex = { awake: d.summary, memory: d.memory_freed + (d.memory_share_text ? ` (${d.memory_share_text})` : ''), cpu: d.cpu_freed,
+    cpu_time: d.cpu_time_saved, updates: `${d.updates_waiting} app${d.updates_waiting === 1 ? '' : 's'}` };
+  document.querySelectorAll('#selfSection small[data-ex]').forEach(el => { el.textContent = ex[el.dataset.ex] || ''; });
+  const stats = [];
+  if (f.includes('memory')) stats.push([d.memory_freed, 'memory freed']);
+  if (f.includes('cpu')) stats.push([d.cpu_freed, 'CPU freed']);
+  if (f.includes('cpu_time')) stats.push([d.cpu_time_saved, 'saved this week']);
+  if (f.includes('updates')) stats.push([String(d.updates_waiting), 'updates waiting']);
+  if (f.includes('awake') && stats.length < 2) stats.push([`${d.asleep} of ${d.apps}`, 'apps asleep']);
+  const pct = d.apps ? d.awake / d.apps * 100 : 0;
+  $('selfPreview').innerHTML = `<div class="ph">${document.querySelector('.logo').innerHTML}<b>Stowaway</b>${f.includes('awake') ? `<span class="aw">${d.awake} awake</span>` : ''}</div>
+    ${f.includes('awake') ? `<div class="pbar" title="${esc(d.summary)}"><i style="width:${pct}%"></i></div>` : ''}
+    <div class="pstats">${stats.slice(0, 4).map(([v, l]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('')}</div>`;
+}
+SUM_FIELDS.forEach(f => $('setForm')['sum_' + f].addEventListener('change', (e) => {
+  if (!readSummaryFields().length) { e.target.checked = true; return; }
+  renderSelfPreview();
+}));
+function selfRow(kind, title, state, btns, on) {
+  const [bg, l] = DTILE[kind];
+  return `<div class="drow" data-k="${kind}"><span class="dtile" style="background:${bg}" aria-hidden="true">${l}</span>
+    <div class="dinfo"><b>${title}</b><span class="dstate${on ? ' on' : ''}" data-state>${state}</span></div><div class="dbtns" data-btns>${btns || ''}</div></div>`;
+}
+function setSelfRow(kind, state, btns, on) {
+  const r = document.querySelector(`#selfList .drow[data-k="${kind}"]`);
+  if (!r) return;
+  const st = r.querySelector('[data-state]');
+  st.innerHTML = state; st.classList.toggle('on', !!on);
+  r.querySelector('[data-btns]').innerHTML = btns || '';
+}
+async function loadSelf(st) {
+  const f = $('setForm'), fields = (st && st.summary_fields) || ['awake', 'memory', 'cpu'];
+  SUM_FIELDS.forEach(k => { f['sum_' + k].checked = fields.includes(k); });
+  $('selfAddr').value = `${sbFor('homepage')}/summary`;
+  $('selfMsg').innerHTML = '';
+  try { selfSum = await (await fetch(`${BASE}/summary`, { credentials: 'same-origin' })).json(); } catch { selfSum = null; }
+  renderSelfPreview();
+  await loadDashApps();
+  const looking = 'Looking…';
+  $('selfList').innerHTML = selfRow('homarr', 'Homarr', looking) + selfRow('heimdall', 'Heimdall', looking) +
+    selfRow('homepage', 'Homepage', looking) + selfRow('glance', 'Glance', looking);
+  $('selfManualBody').innerHTML = codeBlock(`- title: Stowaway
+  url: ${SELF_LINK}
+  icon: https://raw.githubusercontent.com/Sat32blk/Stowaway/main/docs/icon.png
+  statusCheck: true
+  statusCheckUrl: ${sbFor('dashy')}/summary`, 'Dashy (<code>conf.yml</code>): a Stowaway item with a green dot while it runs. Dashy can\'t show the numbers.') +
+    `<p class="hint" style="margin:0">Anything else: read <code>${esc(sbFor('homepage'))}/summary</code>. It has <code>awake</code>, <code>asleep</code>, <code>apps</code>, <code>memory_freed</code>, <code>cpu_freed</code>, <code>cpu_time_saved</code>, <code>updates_waiting</code> and ready-made text like <code>summary</code> ("3 awake · 6 asleep").</p>`;
+  const has = (k) => (dashApps[k] || []).includes('*');
+  // Homarr
+  (async () => {
+    const widget = `<a class="btn" href="${API}/homarr/summary-widget?base=${encodeURIComponent(sbFor('homarr'))}" download="stowaway-summary-widget.json" title="Import once in Homarr: Manage → Custom widgets → Import. Pick Small or Wide in the widget's settings.">Download summary widget</a>`;
+    if (!settingsCache.homarr_url || !settingsCache.homarr_key_set) return setSelfRow('homarr', 'Fill in Homarr\'s address and API key below and Save, or just download the widget.', widget);
+    let r;
+    try { r = await api(`/homarr/app/*?link=${encodeURIComponent(SELF_LINK)}`); } catch (e) { return setSelfRow('homarr', esc(e.message), widget); }
+    const m = r.match;
+    setSelfRow('homarr', m ? `On your Homarr as “${esc(m.name)}”. Add the summary widget to a board for the numbers.` : 'Not added yet. Adds a Stowaway app with a green dot while it runs; the numbers come from the summary widget.',
+      `${widget}<button type="button" class="${m ? '' : 'primary'}" data-s="homarr">${m ? 'Update in Homarr' : 'Add to Homarr'}</button>`, !!m);
+  })();
+  // Heimdall
+  (async () => {
+    let r;
+    try { r = await api('/heimdall'); } catch (e) { return setSelfRow('heimdall', esc(e.message)); }
+    const running = r.containers.filter(c => c.running);
+    if (!r.containers.length) return setSelfRow('heimdall', 'No Heimdall container found on this server.');
+    if (!running.length) return setSelfRow('heimdall', `Start ${esc(r.containers[0].name)} first.`);
+    const pick = running.length > 1 ? `<select data-cont aria-label="Heimdall container">${running.map(c => `<option>${esc(c.name)}</option>`).join('')}</select>` : `<input type="hidden" data-cont value="${esc(running[0].name)}">`;
+    setSelfRow('heimdall', has('heimdall') ? 'On your Heimdall: the Stowaway tile shows the summary' : 'Not added yet. Adds a Stowaway tile showing the summary.',
+      `${pick}<button type="button" class="${has('heimdall') ? '' : 'primary'}" data-s="heimdall">${has('heimdall') ? 'Update tile' : 'Add to Heimdall'}</button>`, has('heimdall'));
+  })();
+  for (const kind of ['homepage', 'glance']) (async () => {
+    let r;
+    try { r = await api('/dash/' + kind); } catch (e) { return setSelfRow(kind, esc(e.message)); }
+    const name = kind === 'homepage' ? 'Homepage' : 'Glance', running = r.containers.filter(c => c.running);
+    if (!r.containers.length) return setSelfRow(kind, `No ${name} container found on this server.`);
+    if (!running.length) return setSelfRow(kind, `Start ${esc(r.containers[0].name)} first.`);
+    const pick = running.length > 1 ? `<select data-cont aria-label="${name} container">${running.map(c => `<option>${esc(c.name)}</option>`).join('')}</select>` : `<input type="hidden" data-cont value="${esc(running[0].name)}">`;
+    const where = kind === 'homepage' ? 'the Stowaway group of services.yaml' : 'stowaway.yml';
+    setSelfRow(kind, has(kind) ? `Added to ${where}` : `Not added yet. Adds Stowaway to ${where}, next to the apps you've added.`,
+      `${pick}<button type="button" class="${has(kind) ? '' : 'primary'}" data-s="${kind}">${has(kind) ? `Update ${name}` : `Add to ${name}`}</button>`, has(kind));
+  })();
+}
+$('selfList').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-s]');
+  if (!b) return;
+  const kind = b.dataset.s, row = b.closest('.drow'), msg = $('selfMsg');
+  const cont = row.querySelector('[data-cont]') ? row.querySelector('[data-cont]').value : null;
+  b.disabled = true; msg.textContent = 'Working…';
+  try {
+    let r;
+    if (kind === 'homarr') {
+      r = await api('/homarr/add', { method: 'POST', body: JSON.stringify({ name: '*', link: SELF_LINK, base: sbFor('homarr') }) });
+      msg.innerHTML = `<b>${esc(r.message)}</b> For the numbers, import the summary widget and add it to a board.`;
+    } else if (kind === 'heimdall') {
+      r = await api('/heimdall/tile', { method: 'POST', body: JSON.stringify({ container: cont, name: '*', link: SELF_LINK, base: sbFor('heimdall') }) });
+      msg.innerHTML = `<b>${esc(r.message)}</b> Reload Heimdall to see it.`;
+    } else {
+      const apps = (dashApps[kind] || []).filter(n => n !== '*').map(n => services.find(s => s.name === n)).filter(s => s && linksFor(s)[0])
+        .map(s => ({ name: s.name, link: linksFor(s)[0] }));
+      if (kind === 'homepage') {
+        await saveSettings();     // Homepage's numbers come from the fields picked above
+        r = await api('/dash/homepage', { method: 'POST', body: JSON.stringify({ container: cont, base: sbFor('homepage'), group: 'Stowaway', apps, stowaway: true, stowaway_link: SELF_LINK }) });
+        msg.innerHTML = `<b>${esc(r.message)}</b> Reload Homepage to see it.`;
+      } else {
+        r = await api('/dash/glance', { method: 'POST', body: JSON.stringify({ container: cont, base: sbFor('glance'), title: 'Apps', apps, stowaway: true }) });
+        msg.innerHTML = `<b>${esc(r.message)}</b>` + (r.included ? '' : glanceIncludeHelp());
+      }
+    }
+    const shown = msg.innerHTML;
+    await loadSelf({ summary_fields: readSummaryFields() });
+    $('selfMsg').innerHTML = shown;
+  } catch (err) { msg.textContent = err.message; b.disabled = false; }
+});
+$('selfAddrCopy').onclick = async () => {
+  const b = $('selfAddrCopy');
+  try { await navigator.clipboard.writeText($('selfAddr').value); b.textContent = 'Copied'; } catch { $('selfAddr').select(); b.textContent = 'Press Ctrl+C'; }
+  setTimeout(() => { b.textContent = 'Copy'; }, 1500);
+};
+
 /* ---------- companion containers ---------- */
 function renderCompanions(c, svc) {
   const main = c ? c.name : (svc && svc.container);

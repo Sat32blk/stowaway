@@ -771,7 +771,8 @@ class Registry:
                          "https_enabled": False, "https_port": 8443, "https_domain": "",
                          "cert_source": "selfsigned", "le_email": "", "le_staging": False,
                          "duckdns_token": "", "cloudflare_token": "", "http_challenge_port": 8480,
-                         "admin_lan_only": True, "homarr_url": "", "homarr_key": ""}
+                         "admin_lan_only": True, "homarr_url": "", "homarr_key": "",
+                         "summary_fields": ["awake", "memory", "cpu"]}
         self.load()
 
     def load(self):
@@ -2512,6 +2513,7 @@ class SettingsIn(BaseModel):
     admin_lan_only: bool = True
     homarr_url: str = ""
     homarr_key: str | None = None          # None or "" keeps the saved key
+    summary_fields: list[str] | None = None  # None keeps the saved choice
 
 
 def get_svc(name: str) -> Service:
@@ -2901,6 +2903,8 @@ async def put_settings(body: SettingsIn):
         "homarr_key": (homarr_key or old.get("homarr_key", "")) if homarr_url else "",
         "debug_until": old.get("debug_until", 0),
         "dash_apps": old.get("dash_apps", {}),
+        "summary_fields": ([f for f in SUMMARY_FIELDS if f in body.summary_fields]
+                           if body.summary_fields is not None else old.get("summary_fields", list(SUMMARY_DEFAULT))),
     }
     https_keys = ("https_enabled", "https_port", "https_domain", "cert_source", "le_email", "le_staging",
                   "duckdns_token", "cloudflare_token", "http_challenge_port")
@@ -3252,8 +3256,11 @@ class HeimdallTileIn(BaseModel):
 async def heimdall_tile(body: HeimdallTileIn):
     """Create or update this app's Heimdall tile: Stowaway tile type, the app's own
     icon, its Stowaway link and status switched on. An existing tile for the app
-    keeps its title and any icon you gave it."""
-    (item,) = await dash_items([{"name": body.name, "link": body.link}])
+    keeps its title and any icon you gave it. name "*" is a tile for Stowaway itself."""
+    if body.name == SELF:
+        item = {"name": SELF, "link": self_link(body.link), "icon": None}
+    else:
+        (item,) = await dash_items([{"name": body.name, "link": body.link}])
     dashboard = dash_base(body.base)
     dashboard = re.sub(r"/_stowaway$", "", dashboard)
     found = {c["name"]: c for c in await heimdall_containers()}
@@ -3264,13 +3271,16 @@ async def heimdall_tile(body: HeimdallTileIn):
         raise HTTPException(409, f"Start {body.container} first.")
     if DEMO:
         record_dash("heimdall", [item["name"]])
-        return {"ok": True, "message": f"Added {item['name']} to Heimdall with its own icon (demo)."}
+        return {"ok": True, "message": f"Added {'Stowaway' if item['name'] == SELF else item['name']} to Heimdall (demo)."}
     dk = driver.dk
     apps_dir, icons_dir = await heimdall_paths(body.container)
     # The app's own icon, from the dashboard-icons collection.
     icon_note, icon_value = "", ""
-    got = await dashsetup.fetch_icon([item["icon"], re.sub(r"[^a-z0-9-]+", "-", item["name"].lower()).strip("-")])
-    if got:
+    got = None if item["name"] == SELF else await dashsetup.fetch_icon(
+        [item["icon"], re.sub(r"[^a-z0-9-]+", "-", item["name"].lower()).strip("-")])
+    if item["name"] == SELF:
+        pass                      # the tile type's own icon is Stowaway's
+    elif got:
         data, ext, slug = got
         fname = f"stowaway-{slug}.{ext}"
         await dk.put_archive(body.container, icons_dir, dashsetup.tar_one(f"{icons_dir}/{fname}", data, None))
@@ -3279,7 +3289,8 @@ async def heimdall_tile(body: HeimdallTileIn):
     else:
         icon_note = (f" Couldn't find an icon for {item['name']} in the dashboard-icons collection, so it shows "
                      "the Stowaway icon; upload the app's icon in the tile to change it.")
-    params = {"name": item["name"], "title": item["name"][:1].upper() + item["name"][1:], "link": item["link"],
+    params = {"name": item["name"], "title": "Stowaway" if item["name"] == SELF else item["name"][:1].upper() + item["name"][1:],
+              "link": item["link"],
               "dashboard": dashboard, "icon": icon_value}
     script, pfile = f"{apps_dir}/Stowaway/.stowaway-tile.php", f"{apps_dir}/Stowaway/.stowaway-tile.json"
 
@@ -3317,7 +3328,8 @@ async def heimdall_tile(body: HeimdallTileIn):
             icon_note = " Its icon was kept."
     else:
         raise HTTPException(500, "Heimdall didn't say whether the tile was saved.")
-    msg += f": it opens {item['name']} through Stowaway and shows whether it's awake." + icon_note
+    msg += (": it opens the Stowaway dashboard and shows how many apps are awake and what sleeping them frees."
+            if item["name"] == SELF else f": it opens {item['name']} through Stowaway and shows whether it's awake.") + icon_note
     record_dash("heimdall", [item["name"]])
     log.info("%s", msg)
     return {"ok": True, "message": msg}
@@ -3367,6 +3379,24 @@ def record_dash(kind: str, names: list[str], replace: bool = False):
     cur = [] if replace else list(d.get(kind) or [])
     d[kind] = sorted(set(cur) | set(names))
     reg.save()
+
+
+SELF = "*"     # stands for Stowaway itself in the dashboard setup calls
+
+
+def self_link(given: str | None) -> str | None:
+    """Where Stowaway's own tile opens (its dashboard), given now or remembered from before."""
+    d = reg.settings.setdefault("dash_apps", {})
+    if given:
+        try:
+            d["self_link"] = dashsetup.check_url(given, "Stowaway's dashboard address")
+        except dashsetup.SetupError as e:
+            raise HTTPException(400, str(e))
+    return d.get("self_link")
+
+
+def self_wanted(kind: str, add: bool) -> bool:
+    return add or SELF in ((reg.settings.get("dash_apps") or {}).get(kind) or [])
 
 
 @admin.get("/api/dash-apps")
@@ -3419,18 +3449,25 @@ class HomepageIn(BaseModel):
     container: str
     base: str
     group: str = "Stowaway"
-    apps: list[DashApp]
+    apps: list[DashApp] = []
+    stowaway: bool = False          # add (or keep) Stowaway's own tile
+    stowaway_link: str | None = None
 
 
 @admin.post("/api/dash/homepage")
 async def dash_homepage(body: HomepageIn):
-    items, base = await dash_items(body.apps), dash_base(body.base)
+    base = dash_base(body.base)
+    with_self = self_wanted("homepage", body.stowaway)
+    link = self_link(body.stowaway_link) if with_self else None
+    items = await dash_items(body.apps) if body.apps or not with_self else []
     group = (body.group or "").strip()[:60] or "Stowaway"
     attrs = await dash_target("homepage", body.container)
-    block = dashsetup.homepage_block(group, items, base)
+    entry = dashsetup.homepage_self(base, link or base.removesuffix("/_stowaway"), reg.settings.get("summary_fields") or list(SUMMARY_DEFAULT)) if with_self else None
+    block = dashsetup.homepage_block(group, items, base, entry)
+    names = [i["name"] for i in items] + ([SELF] if with_self else [])
     if DEMO:
-        record_dash("homepage", [i["name"] for i in items], replace=True)
-        return {"ok": True, "message": f"Wrote {len(items)} app(s) to services.yaml (demo)."}
+        record_dash("homepage", names, replace=True)
+        return {"ok": True, "message": f"Wrote {len(items)} app(s){' and Stowaway itself' if with_self else ''} to services.yaml (demo)."}
     path = homepage_path(attrs)
     data, info = await driver.dk.get_archive(body.container, path)
     text = (data or b"").decode("utf-8", "replace")
@@ -3444,8 +3481,9 @@ async def dash_homepage(body: HomepageIn):
         await dashsetup.write_file(driver.dk, body.container, backup, data, info)
     await dashsetup.write_file(driver.dk, body.container, path, new.encode(), info)
     log.info("wrote %d app(s) to Homepage's services.yaml in %s", len(items), body.container)
-    record_dash("homepage", [i["name"] for i in items], replace=True)
-    msg = f"Wrote {len(items)} app(s) to the \"{group}\" group in services.yaml."
+    record_dash("homepage", names, replace=True)
+    msg = (f"Wrote {len(items)} app(s){' and Stowaway itself' if with_self else ''} "
+           f"to the \"{group}\" group in services.yaml.")
     if data and not have_backup:
         msg += " Your original was saved as services.yaml.before-stowaway."
     if not dashsetup.on_volume(attrs, path):
@@ -3457,17 +3495,21 @@ class GlanceIn(BaseModel):
     container: str
     base: str
     title: str = "Apps"
-    apps: list[DashApp]
+    apps: list[DashApp] = []
+    stowaway: bool = False
 
 
 @admin.post("/api/dash/glance")
 async def dash_glance(body: GlanceIn):
-    items, base = await dash_items(body.apps), dash_base(body.base)
+    base = dash_base(body.base)
+    with_self = self_wanted("glance", body.stowaway)
+    items = await dash_items(body.apps) if body.apps or not with_self else []
     attrs = await dash_target("glance", body.container)
-    content = dashsetup.glance_file(items, base, (body.title or "").strip()[:60] or "Apps")
+    content = dashsetup.glance_file(items, base, (body.title or "").strip()[:60] or "Apps", with_self)
+    names = [i["name"] for i in items] + ([SELF] if with_self else [])
     if DEMO:
-        record_dash("glance", [i["name"] for i in items], replace=True)
-        return {"ok": True, "included": False, "message": f"Wrote stowaway.yml with {len(items)} app(s) (demo)."}
+        record_dash("glance", names, replace=True)
+        return {"ok": True, "included": False, "message": f"Wrote stowaway.yml with {len(items)} app(s){' and Stowaway itself' if with_self else ''} (demo)."}
     main_cfg = glance_path(attrs)
     data, info = await driver.dk.get_archive(body.container, main_cfg)
     if data is None:
@@ -3475,9 +3517,9 @@ async def dash_glance(body: GlanceIn):
     path = posixpath.join(posixpath.dirname(main_cfg), dashsetup.GLANCE_FILE)
     await dashsetup.write_file(driver.dk, body.container, path, content.encode(), info)
     included = dashsetup.glance_includes(data.decode("utf-8", "replace"))
-    record_dash("glance", [i["name"] for i in items], replace=True)
+    record_dash("glance", names, replace=True)
     log.info("wrote %s with %d app(s) in %s", path, len(items), body.container)
-    msg = f"Wrote stowaway.yml with {len(items)} app(s)."
+    msg = f"Wrote stowaway.yml with {len(items)} app(s){' and Stowaway itself' if with_self else ''}."
     msg += (" Glance picks up the change by itself." if included else
             " One more step: add the line below to glance.yml.")
     if not dashsetup.on_volume(attrs, path):
@@ -3526,14 +3568,22 @@ async def homarr_test(body: HomarrTestIn):
 @admin.get("/api/homarr/app/{name}")
 async def homarr_app(name: str, link: str = ""):
     """Whether Homarr already has this app (matched by link, address and port, or name)."""
-    svc = get_svc(name)
+    svc = None if name == SELF else get_svc(name)
     if not reg.settings.get("homarr_url") or not reg.settings.get("homarr_key"):
         return {"configured": False}
     url, key = homarr_conn()
     apps = await homarr_apps(url, key)
-    mid = dashsetup.homarr_match(apps, svc.name, link) if link else None
+    mid = dashsetup.homarr_match(apps, svc.name if svc else "Stowaway", link) if link else None
     match = next(({k: a.get(k) for k in ("id", "name", "href", "pingUrl")} for a in apps if a["id"] == mid), None)
     return {"configured": True, "url": url, "match": match}
+
+
+@admin.get("/api/homarr/summary-widget")
+async def homarr_summary_widget(base: str):
+    """The "Stowaway summary" custom widget for Homarr (small or wide), to import once."""
+    data = json.dumps(dashsetup.homarr_summary_widget(dash_base(base)), indent=2)
+    return Response(data, media_type="application/json",
+                    headers={"Content-Disposition": 'attachment; filename="stowaway-summary-widget.json"'})
 
 
 @admin.get("/api/homarr/widget")
@@ -3553,12 +3603,17 @@ class HomarrAddIn(BaseModel):
 @admin.post("/api/homarr/add")
 async def homarr_add(body: HomarrAddIn):
     """Put one app in Homarr: update the matching Homarr app (its name, icon and
-    description are kept; link and Ping URL are set), or add it as a new app."""
-    (item,) = await dash_items([{"name": body.name, "link": body.link}])
+    description are kept; link and Ping URL are set), or add it as a new app.
+    name "*" adds Stowaway itself (opens its dashboard; the dot is green while it runs)."""
+    is_self = body.name == SELF
+    if is_self:
+        item = {"name": "Stowaway", "link": self_link(body.link), "icon": None}
+    else:
+        (item,) = await dash_items([{"name": body.name, "link": body.link}])
     base = dash_base(body.base)
     url, key = homarr_conn()
     apps = await homarr_apps(url, key)
-    _, dot = dashsetup.status_urls(base, item["name"])
+    dot = f"{base}/summary" if is_self else dashsetup.status_urls(base, item["name"])[1]
     mid = dashsetup.homarr_match(apps, item["name"], item["link"])
     a = next((x for x in apps if x["id"] == mid), None)
     try:
@@ -3567,11 +3622,14 @@ async def homarr_add(body: HomarrAddIn):
                        "iconUrl": a.get("iconUrl") or "", "href": item["link"], "pingUrl": dot}
             if not DEMO:
                 await dashsetup.homarr_call("PATCH", url, key, f"/api/apps/{quote(a['id'], safe='')}", payload)
-            msg = (f"Updated “{a['name']}” in Homarr: it now opens {item['name']} through Stowaway "
+            msg = (f"Updated “{a['name']}” in Homarr: it now opens the Stowaway dashboard, and its dot is green while Stowaway runs."
+                   if is_self else f"Updated “{a['name']}” in Homarr: it now opens {item['name']} through Stowaway "
                    "and its status dot shows whether it's awake.")
         else:
-            payload = {"name": item["name"][:64], "description": "Wakes when opened · managed by Stowaway",
-                       "iconUrl": f"https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/{item['icon']}.svg",
+            payload = {"name": item["name"][:64],
+                       "description": "Wakes apps when opened" if is_self else "Wakes when opened · managed by Stowaway",
+                       "iconUrl": dashsetup.STOWAWAY_ICON if is_self else
+                                  f"https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/{item['icon']}.svg",
                        "href": item["link"], "pingUrl": dot}
             if not DEMO:
                 await dashsetup.homarr_call("POST", url, key, "/api/apps", payload)
@@ -3579,7 +3637,7 @@ async def homarr_add(body: HomarrAddIn):
                    f"with {item['name']}; turn on its status option for the dot.")
     except dashsetup.SetupError as e:
         raise HTTPException(400, str(e))
-    record_dash("homarr", [item["name"]])
+    record_dash("homarr", [SELF if is_self else item["name"]])
     log.info("Homarr: %s", msg)
     return {"ok": True, "updated": bool(a), "message": msg}
 
@@ -4204,6 +4262,79 @@ async def public_status_all(request: Request, code: bool = False):
     asleep = sum(1 for i in items if i["controlled"] and i["state"] not in AWAKE_STATES)
     return JSONResponse({"apps": items, "awake": awake, "asleep": asleep,
                          "summary": f"{awake} awake · {asleep} asleep"}, headers=PUBLIC_HEADERS)
+
+
+SUMMARY_FIELDS = ("awake", "memory", "cpu", "cpu_time", "updates")
+SUMMARY_DEFAULT = ("awake", "memory", "cpu")
+
+
+def fmt_mb(mb: float) -> str:
+    if mb >= 1024:
+        gb = mb / 1024
+        return f"{gb:.0f} GB" if gb >= 10 else f"{gb:.1f} GB"
+    return f"{mb:.0f} MB"
+
+
+def fmt_pct(p: float) -> str:
+    return f"{p:.1f}%" if p < 10 else f"{p:.0f}%"
+
+
+def stowaway_summary() -> dict:
+    """Stowaway as a whole, for its own dashboard tile: apps awake and asleep, and
+    what sleeping them frees."""
+    awake = asleep = 0
+    freed_cpu = freed_mem = 0.0
+    for svc in reg.services.values():
+        fresh(svc)
+        if svc.status == "running" or svc.transition in ("starting", "updating", "maintenance"):
+            awake += 1
+        else:
+            asleep += 1
+            b = savings.baseline(svc.name)
+            if b:
+                freed_cpu += b["cpu"]
+                freed_mem += b["mem"]
+    apps = awake + asleep
+    mem_share = freed_mem / HOST["mem_mb"] if HOST.get("mem_mb") else None
+    cpu_share = freed_cpu / (HOST.get("ncpu", 1) * 100) * 100        # % of the whole CPU
+    cpu_h = savings.period(7)["cpu_s"] / 3600
+    names = {s.container for s in reg.services.values()} | set(reg.maintenance)
+    updates_waiting = sum(1 for n in names if update_state(n)["available"])
+    fields = list(reg.settings.get("summary_fields") or SUMMARY_DEFAULT)
+    tile = []
+    if "awake" in fields:
+        tile.append({"label": "Awake", "value": f"{awake} of {apps}", "color": "#40c057" if awake else "#909296"})
+    if "memory" in fields:
+        tile.append({"label": "Freed", "value": fmt_mb(freed_mem), "color": "#ffffff"})
+    if "cpu" in fields:
+        tile.append({"label": "CPU", "value": fmt_pct(cpu_share), "color": "#ffffff"})
+    if "cpu_time" in fields:
+        tile.append({"label": "Saved", "value": f"{cpu_h:.1f} h", "color": "#ffffff"})
+    if "updates" in fields:
+        tile.append({"label": "Updates", "value": str(updates_waiting), "color": "#fab005" if updates_waiting else "#ffffff"})
+    return {
+        "name": "Stowaway", "version": VERSION,
+        "apps": apps, "awake": awake, "asleep": asleep,
+        "awake_text": f"{awake} of {apps}", "summary": f"{awake} awake · {asleep} asleep",
+        "memory_freed_mb": round(freed_mem), "memory_freed": fmt_mb(freed_mem),
+        "memory_share": round(mem_share, 4) if mem_share is not None else None,
+        "memory_share_text": f"{mem_share * 100:.1f}% of RAM" if mem_share is not None else "",
+        "cpu_freed_percent": round(cpu_share, 2), "cpu_freed": fmt_pct(cpu_share),
+        "cpu_hours_7d": round(cpu_h, 2), "cpu_time_saved": f"{cpu_h:.1f} h",
+        "updates_waiting": updates_waiting,
+        "fields": fields,
+        "show": {f: f in fields for f in SUMMARY_FIELDS},
+        "tile": tile[:3],      # Heimdall's tile has room for three
+    }
+
+
+@app.get(ADMIN + "/summary")
+async def public_summary(request: Request, code: bool = False):
+    """Stowaway's own totals, for its dashboard tile (dashboard port, home network).
+    Always 200 while Stowaway runs, so a dashboard's status dot shows it's up."""
+    if not is_dashboard(request) or not lan_ok(request):
+        raise HTTPException(404)
+    return JSONResponse(stowaway_summary(), headers=PUBLIC_HEADERS)
 
 
 @app.get(ADMIN + "/status/{name}")

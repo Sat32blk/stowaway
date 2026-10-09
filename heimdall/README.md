@@ -40,3 +40,5 @@ Heimdall downloads its app list from [linuxserver/Heimdall-Apps](https://github.
 3. Open a pull request.
 
 The folder follows the same layout as other enhanced apps: `Stowaway.php`, `app.json`, `config.blade.php`, `livestats.blade.php` and the icon. Before submitting, change the `website` in `app.json` to your published repository.
+
+**A tile for Stowaway itself:** with `*` as the App name, the tile shows Stowaway's totals instead of one app's status (apps awake, memory freed, CPU freed; chosen in Stowaway's System Settings → Dashboards). **Add to Heimdall** under *Stowaway on your dashboard* sets this up for you. Needs Stowaway 1.6.1 or later.

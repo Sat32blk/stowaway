@@ -304,6 +304,7 @@ Use each app's link port as the tile's URL; clicking it wakes the app. An app's 
 | `http://<server>:8880/_stowaway/status/<app>` | JSON: `state`, the status label (`indicator`, see below) with its colour and icon, a one-line `summary`, `sleeps_at`/`sleeps_in`, keep-awake, "don't wake" and next/last scheduled restart. Never wakes the app. |
 | `…/status/<app>?code=1` | The same, but **HTTP 503 while the app is asleep**, so a dashboard's status dot shows green when awake and red when asleep. |
 | `…/_stowaway/status` | Every app in one list (dashboard port only, home network only by default). |
+| `…/_stowaway/summary` | Stowaway itself: apps awake and asleep, memory and CPU freed, CPU time saved and updates waiting (dashboard port, home network). Always 200 while Stowaway runs. |
 
 **Status labels.** Dashboards that can show text get one clear label per app:
 
@@ -330,6 +331,21 @@ The status JSON carries it as `indicator`, `indicator_color` (a colour name), `i
 - **Homarr:** save Homarr's address and an API key once under **System Settings → Dashboards** (create the key in Homarr under *Manage → Tools → API* as an admin; Homarr 1.0+). Then click **Add to Homarr** in an app's Dashboards tab. If Homarr already has that app, it's updated instead: its name and icon are kept, and its link and Ping URL are set. New apps land in Homarr's app list; place them on a board with an App widget. The key stays on the Stowaway server and isn't shown again or included in diagnostic reports.
 - **Homepage:** writes a *Stowaway* group with the apps you've added to `services.yaml`, between two marker comments. Adding another app rewrites the group with it included. Only that block is ever rewritten; the rest of the file stays as it is, and the first time your original is saved as `services.yaml.before-stowaway`.
 - **Glance:** writes `stowaway.yml` next to `glance.yml` (a status monitor for the apps you've added plus a list of all apps). Add it to a page once with `- $include: stowaway.yml` in a column's `widgets:`; after that Glance reloads it by itself.
+
+### Stowaway itself on your dashboard
+
+Besides each app's status, your dashboard can show a tile for **Stowaway itself**: how many apps are awake and asleep, and how much memory and CPU sleeping them frees. Set it up in **System Settings → Dashboards → Stowaway on your dashboard**:
+
+![Stowaway on your dashboard](docs/screenshots/stowaway-tile.png)
+
+- **What the tile shows:** apps awake and asleep, memory freed and CPU freed are on by default; CPU time saved this week and updates waiting can be added. A preview shows the result.
+- **Homarr:** **Add to Homarr** adds a Stowaway app that opens the dashboard, with a green dot while Stowaway runs. For the numbers, **Download summary widget** and import it once (*Manage → Custom widgets → Import*), then add *Stowaway summary* to a board and pick **Small** (2×2) or **Wide** (4×2) in its settings.
+- **Heimdall:** **Add to Heimdall** adds a Stowaway tile showing three of the numbers (e.g. *Awake 3 of 9 · Freed 5.1 GB · CPU 0.1%*). It uses the same Stowaway tile type as your apps.
+- **Homepage:** adds Stowaway to the *Stowaway* group in `services.yaml`, with Awake / Asleep / Mem freed / CPU freed boxes (Homepage shows up to four). After changing the fields, click **Update Homepage**.
+- **Glance:** adds a Stowaway widget to `stowaway.yml`, above the list of apps.
+- **Dashy and others:** Dashy gets a green dot from the summary address; anything else can read its JSON.
+
+Homarr, Heimdall and Glance follow the field choices by themselves; adding an app to Homepage or Glance later keeps the Stowaway tile.
 
 **Dashboard on a macvlan network?** It can't reach the server's own address, so its status checks fail ("fetch failed"). Use the macvlan helper IP instead, e.g. `http://192.168.1.60:8880/_stowaway/status/<app>?code=1`. Stowaway gives every container on a macvlan network a route through the helper once a helper IP is set, and the Dashboards tab fills in the helper address for you when it sees your dashboard on macvlan. Tile links you click keep using the usual address.
 
