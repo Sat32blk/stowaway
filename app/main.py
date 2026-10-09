@@ -1796,6 +1796,84 @@ def indicator(kind: str, sleeps_in: float | None = None) -> dict:
     return {"indicator": label, "indicator_color": color, "indicator_hex": hexc, "indicator_icon": icon}
 
 
+_DAYS_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+def _mins_text(sec: float) -> str:
+    m = max(1, round(sec / 60))
+    if m < 60:
+        return f"{m} min"
+    h, r = divmod(m, 60)
+    return f"{h} h {r} min" if r else f"{h} h"
+
+
+def _time12(t: str) -> str:
+    h, m = (int(x) for x in t.split(":"))
+    ap, h12 = ("am" if h < 12 else "pm"), (h % 12 or 12)
+    return f"{h12}:{m:02d} {ap}" if m else f"{h12} {ap}"
+
+
+def _days_text(days) -> str:
+    d = sorted(days or [])
+    if len(d) == 7:
+        return "every day"
+    if d == [0, 1, 2, 3, 4]:
+        return "weekdays"
+    if d == [5, 6]:
+        return "weekends"
+    return ", ".join(_DAYS_SHORT[i] for i in d if 0 <= i < 7)
+
+
+def sleep_mode(svc: "Service") -> dict:
+    """How an app is put to sleep, in the words of the app list's Sleep column."""
+    hours = []
+    for w in svc.awake_hours or []:
+        with contextlib.suppress(Exception):
+            hours.append(f"Awake {_time12(w['from'])} to {_time12(w['to'])} {_days_text(w.get('days'))}")
+    if svc.idle_timeout > 0:
+        mode, text = "idle", f"Sleeps after {_mins_text(svc.idle_timeout)}"
+    else:
+        mode, text = "manual", "Sleeps only when told"
+    return {"mode": mode, "mode_text": text, "awake_while_busy": svc.idle_timeout > 0 and svc.busy_check is not False,
+            "awake_hours": hours}
+
+
+def ua_name(ua: str | None) -> str:
+    """"Chrome on Windows" from a browser's user agent (same as the app list)."""
+    if not ua:
+        return "a browser"
+    b = ("Edge" if "Edg/" in ua else "Opera" if "OPR/" in ua else "Firefox" if "Firefox/" in ua
+         else "Chrome" if "Chrome/" in ua else "Safari" if "Safari/" in ua else None)
+    os_ = ("Android" if "Android" in ua else "iPhone/iPad" if re.search(r"iPhone|iPad|iPod", ua)
+           else "Chromebook" if "CrOS" in ua else "Mac" if re.search(r"Macintosh|Mac OS X", ua)
+           else "Windows" if "Windows" in ua else "Linux" if "Linux" in ua else None)
+    if b:
+        return f"{b} on {os_}" if os_ else b
+    m = re.match(r"^([A-Za-z][\w .-]{1,40}?)/", ua)
+    return m.group(1) if m else ua[:40]
+
+
+def opened_brief(rec: dict | None) -> dict | None:
+    """What last woke or opened an app, for Home Assistant: who, plus the details."""
+    if not rec:
+        return None
+    kind = rec.get("kind")
+    if kind == "visit":
+        who = rec.get("host") or ua_name(rec.get("ua"))
+        device = ua_name(rec.get("ua")) if rec.get("ua") and rec.get("host") else None
+    elif kind == "ha":
+        who, device = "Home Assistant", None
+    elif kind == "api":
+        who, device = rec.get("detail") or "the API", None
+    elif kind == "schedule":
+        who, device = "Awake hours", None
+    else:
+        who, device = ("Keep awake" if rec.get("detail") == "Keep awake" else "Wake button"), None
+    out = {"kind": kind, "who": who, "at": rec.get("at"), "ip": rec.get("ip"), "host": rec.get("host"),
+           "device": device, "detail": rec.get("detail")}
+    return {k: v for k, v in out.items() if v is not None}
+
+
 def app_status(svc: "Service") -> dict:
     now = time.time()
     if svc.transition:
@@ -1874,6 +1952,8 @@ def app_status(svc: "Service") -> dict:
         "maintenance": m,
         "idle_timeout": svc.idle_timeout,
         "sleeps_in": round(sleeps_in) if sleeps_in is not None else None,
+        **sleep_mode(svc),
+        "last_open": opened_brief(opened.get(svc.name)),
         **indicator(kind, sleeps_in),
     }
 
@@ -1893,8 +1973,12 @@ async def container_status(name: str):
         summary += " · maintenance running"
     elif m["next_restart_text"]:
         summary += f" · restart {m['next_restart_text']}"
+    use = (usage_of(name) or {}) if running else {}
     return {"name": name, "container": name, "controlled": False, "state": "running" if running else "stopped",
             "running": running, "summary": summary, "wake_blocked": False, "maintenance": m,
+            "cpu": use.get("cpu"), "memory_mb": use.get("mem"), "mode": "schedule",
+            "mode_text": ("Not managed · restarts " + re.sub(r"^(Daily|Monthly)", lambda x: x.group(1).lower(), m["schedule"]))
+            if m.get("schedule") else "Not managed",
             **indicator("updating" if m["running"] else "running" if running else "stopped")}
 
 # --------------------------------------------------------------------------

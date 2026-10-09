@@ -358,13 +358,12 @@ If a dashboard pings the app's link directly instead, add its user agent (e.g. `
 **Apps only Home Assistant should control.** In the app's **Settings → Sleep**, choose *Only when told*. Stowaway then never puts it to sleep by itself: Home Assistant (for example when nobody is home), the API, a scheduled restart or **Sleep now** decide. The link port is optional in this mode; without one, the app is woken from Home Assistant or the dashboard rather than by opening a link.
 
 The **Stowaway** integration for Home Assistant lives in its own repository (`stowaway-homeassistant`), installed through HACS. Each app gets:
-- an **Awake** switch;
-- a **Don't wake** switch;
-- **Status**, **Sleeps at** and **Next restart** sensors;
-- **Maintenance running** and **Update ready** sensors;
-- **Restart now** and **Keep awake 1 hour** buttons.
+- an **Awake** switch to wake it or put it to sleep;
+- a **Keep awake** select (off, 30 minutes to 24 hours, or until released);
+- **Status**, **Sleep mode**, **CPU**, **Memory** and **Last woken by** sensors, matching the app list;
+- an **Update ready** sensor.
 
-It also adds actions to keep an app awake or put it to sleep (optionally switching waking off).
+Apps added to or removed from Stowaway appear in or disappear from Home Assistant on their own. It also adds actions to keep an app awake, put it to sleep (optionally stopping visitors from waking it) and allow waking again.
 
 Setup: **System Settings → Home Assistant → Create token** in Stowaway, then add the integration in Home Assistant with Stowaway's address and the token. Each app's **Settings → Home Assistant** tab lists what Home Assistant gets for it, and has copy-paste REST switch/sensor configuration for use without HACS.
 

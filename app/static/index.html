@@ -2323,16 +2323,19 @@ function renderHaTab() {
   if (!s) return;
   $('haIntro').innerHTML = `With the <b>Stowaway</b> integration (from HACS), Home Assistant gets these for ${esc(s.name)}. Use them in automations, for example put apps to sleep while nobody's home.`;
   const tmp = document.createElement('span'); tmp.innerHTML = stateLabel(s);
-  const m = s.maintenance || {};
+  const run = s.status === 'running';
+  const op = openedInfo(s.last_open);
+  const mode = s.idle_timeout > 0 ? `Sleeps after ${fmtMins(s.idle_timeout)}` : 'Sleeps only when told';
+  const ka = s.forced === 'hold' ? (s.forced_until ? `Until ${fmtWhen(s.forced_until)}` : 'Until released') : 'Off';
   const ents = [
-    ['Awake', 'switch: wakes it or puts it to sleep', s.status === 'running' ? 'On' : 'Off'],
-    ['Don\'t wake', 'switch: stops its link from waking it', s.block_wake ? 'On' : 'Off'],
+    ['Awake', 'switch: wakes it or puts it to sleep', run ? 'On' : 'Off'],
+    ['Keep awake', 'select: off, 30 minutes to 24 hours, or until released', ka],
     ['Status', 'sensor', tmp.textContent],
-    ['Sleeps at', 'sensor', s.sleeps_at ? fmtWhen(s.sleeps_at) : 'unknown'],
-    ['Next restart', 'sensor', m.next_restart_text || 'none'],
-    ['Maintenance running', 'binary sensor', m.running ? 'On' : 'Off'],
+    ['Sleep mode', 'sensor', mode],
+    ['CPU', 'sensor', run && s.stats ? `${s.stats.cpu}%` : '0%'],
+    ['Memory', 'sensor', run && s.stats ? fmtMB(s.stats.mem) : '0 MB'],
+    ['Last woken by', 'sensor', op.who || 'unknown'],
     ['Update ready', 'binary sensor', s.updates && s.updates.available ? 'On' : 'Off'],
-    ['Restart now · Keep awake 1 hour', 'buttons', ''],
   ];
   $('haList').className = 'dlist ents';
   $('haList').innerHTML = ents.map(([n, k, v]) => `<div class="drow"><div class="dinfo"><b>${esc(n)}</b><small>${esc(k)}</small></div><span>${esc(v)}</span></div>`).join('');
