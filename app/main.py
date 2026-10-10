@@ -630,7 +630,8 @@ class Service:
     def __init__(self, name: str, cfg: dict):
         self.name = name
         self.last_activity = time.time()
-        self.active = 0              # requests currently being proxied
+        self.active = 0              # requests currently being proxied (not dashboard status checks)
+        self.last_use = 0.0          # last time someone used it through its link (not status checks)
         self.status = "unknown"      # last status seen from Docker
         self.transition = None       # "starting" / "stopping" while in progress
         self.error = None
@@ -1796,6 +1797,7 @@ def indicator(kind: str, sleeps_in: float | None = None) -> dict:
     return {"indicator": label, "indicator_color": color, "indicator_hex": hexc, "indicator_icon": icon}
 
 
+IN_USE_RECENT = float(os.environ.get("IN_USE_SECONDS", "120"))   # shown as In Use this long after its last use
 _DAYS_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
@@ -1885,6 +1887,9 @@ def app_status(svc: "Service") -> dict:
     else:
         state = "sleeping"
     reason, until = forced(svc, now)
+    # In use: a request or live connection right now, busy, or used through its link in the
+    # last couple of minutes (an open page loads things now and then, not all the time).
+    used_lately = bool(svc.last_use) and now - svc.last_use < IN_USE_RECENT
     sleeps_at = None
     if state == "running" and not reason and svc.idle_timeout > 0 and not svc.active and not svc.busy_now:
         sleeps_at = max(svc.last_activity, svc.last_busy) + svc.idle_timeout
@@ -1897,7 +1902,7 @@ def app_status(svc: "Service") -> dict:
             summary = "Awake · kept awake" + (f" until {_short_when(until)}" if until else "")
         elif reason == "schedule":
             summary = f"Awake · awake hours until {_short_when(until)}"
-        elif svc.active:
+        elif svc.active or used_lately:
             summary = "Awake · in use"
         elif svc.busy_now:
             summary = "Awake · busy"
@@ -1919,7 +1924,7 @@ def app_status(svc: "Service") -> dict:
     if state == "running":
         if reason:
             kind = "kept"
-        elif svc.active or svc.busy_now:
+        elif svc.active or svc.busy_now or used_lately:
             kind = "in_use"
         elif sleeps_in:
             kind = "countdown"
@@ -1941,6 +1946,7 @@ def app_status(svc: "Service") -> dict:
         "kept_awake_until": until if reason == "hold" else None,
         "awake_hours_until": until if reason == "schedule" else None,
         "in_use": svc.active,
+        "used_lately": used_lately,
         "busy": svc.busy_now,
         "cpu": (svc.stats or {}).get("cpu"),
         "memory_mb": (svc.stats or {}).get("mem"),
@@ -4607,7 +4613,10 @@ async def forward(request: Request, svc: Service, retry: bool = True, passive: b
     has_body = "content-length" in request.headers or "transfer-encoding" in request.headers
 
     client: httpx.AsyncClient = request.app.state.http
-    svc.active += 1
+    n = 0 if passive else 1          # dashboard status checks don't count as use
+    svc.active += n
+    if n:
+        svc.last_use = time.time()
     try:
         req = client.build_request(request.method, url, headers=headers,
                                    content=request.stream() if has_body else None)
@@ -4615,7 +4624,7 @@ async def forward(request: Request, svc: Service, retry: bool = True, passive: b
         log.debug("%s %s for %s from %s -> %d", request.method, request.url.path, svc.name, client_ip,
                   resp.status_code)
     except (httpx.ConnectError, httpx.ConnectTimeout):
-        svc.active -= 1
+        svc.active -= n
         # Stopped or recreated outside of us (new IP): look it up again, start, retry once.
         svc.status = await driver.status(svc.container)
         await resolve(svc)
@@ -4627,14 +4636,14 @@ async def forward(request: Request, svc: Service, retry: bool = True, passive: b
             return await forward(request, svc, retry=False, passive=passive)
         return JSONResponse({"error": f"could not reach {svc.name}"}, 502)
     except Exception:
-        svc.active -= 1
+        svc.active -= n
         raise
 
     async def finished():
         await resp.aclose()
-        svc.active -= 1
+        svc.active -= n
         if not passive:
-            svc.last_activity = time.time()
+            svc.last_activity = svc.last_use = time.time()
 
     out = StreamingResponse(resp.aiter_raw(), status_code=resp.status_code,
                             background=BackgroundTask(finished))
@@ -4714,7 +4723,7 @@ async def ws_proxy(ws: WebSocket, path: str):
     if svc.block_wake and (svc.status != "running" or svc.transition == "stopping"):
         await ws.close(code=1013)          # "try again later": switched off for now
         return
-    svc.last_activity = time.time()
+    svc.last_activity = svc.last_use = time.time()
     note_open(svc, "visit", ws)
     if svc.status != "running" or svc.transition:
         try:
@@ -4794,7 +4803,7 @@ async def ws_proxy(ws: WebSocket, path: str):
             await upstream.close()
     finally:
         svc.active -= 1
-        svc.last_activity = time.time()
+        svc.last_activity = svc.last_use = time.time()
 
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])

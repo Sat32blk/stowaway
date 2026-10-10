@@ -310,9 +310,9 @@ Use each app's link port as the tile's URL; clicking it wakes the app. An app's 
 
 | Label | Colour | When |
 |---|---|---|
-| **In Use** | green | someone is connected, or the app is busy (a transcode, a download) |
+| **In Use** | green | someone is using it through its Stowaway link (now, or in the last 2 minutes), or the app is busy (a transcode, a download) |
 | **Sleeping in 8 min** | yellow | awake and idle; counts down to sleep |
-| **Idle** | orange | awake with nothing to do: an "Only when I say so" app, or the timer has just run out |
+| **Idle** | orange | awake with nothing to do: an "Only when I say so" app nobody has used for 2 minutes, or the timer has just run out |
 | **Sleeping** | grey | asleep; opening it wakes it |
 | *Waking up*, *Going to sleep*, *Updating* | blue | for the moments in between |
 | *Kept awake* | teal | you asked Stowaway to keep it awake (or it's within its awake hours) |
@@ -438,6 +438,7 @@ Logs are also kept in `config/logs/` (up to about 3 MB, readable only by root), 
 | `MACVLAN_HELPER_IP` | empty | Address for the macvlan helper; overrides System Settings → Network |
 | `STATS_INTERVAL` | `15` | Seconds between CPU/network samples of awake apps (busy detection) |
 | `USAGE_INTERVAL` | `20` | Seconds between CPU/memory samples of the other running containers, for the app list |
+| `IN_USE_SECONDS` | `120` | How long an app shows **In Use** after someone last used it through its link |
 | `DOCKER_HOST` | local socket | Another way to reach Docker, e.g. `tcp://socket-proxy:2375` |
 
 ## Security
