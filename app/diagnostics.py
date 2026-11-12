@@ -2,7 +2,7 @@
 
 - Every log line also goes to a small in-memory buffer and to config/logs/stowaway.log
   (rotated at 1 MB, three files kept, readable only by root), so the report can include
-  what happened before a restart.
+  what happened before a restart. The file is written in batches (see _BufferedFile).
 - Secrets are removed from every log line, wherever it goes: API keys and tokens in URLs,
   passwords, Authorization headers, and the DuckDNS/Cloudflare tokens from Settings.
 - Detailed (debug) logging can be switched on from Settings; it switches itself off
@@ -96,6 +96,33 @@ class _PrivateRotatingFile(logging.handlers.RotatingFileHandler):
         return f
 
 
+class _BufferedFile(logging.handlers.MemoryHandler):
+    """The log file is written in batches: warnings and errors right away, everything
+    else about once a minute (flush() below) or when 200 lines have collected. Console
+    output (docker logs) and the in-memory buffer still get every line immediately."""
+
+    def __init__(self, target):
+        super().__init__(capacity=200, flushLevel=logging.WARNING, target=target)
+        self.flushed_at = time.time()
+
+    def setFormatter(self, fmt):
+        super().setFormatter(fmt)
+        self.target.setFormatter(fmt)
+
+    def flush(self):
+        self.flushed_at = time.time()
+        super().flush()
+        if self.target and getattr(self.target, "stream", None):
+            self.target.flush()
+
+
+def flush(if_older: float = 0):
+    """Write buffered log lines to the log file, if the oldest has waited this long."""
+    for h in logging.getLogger().handlers:
+        if isinstance(h, _BufferedFile) and h.buffer and time.time() - h.flushed_at >= if_older:
+            h.flush()
+
+
 def setup(config_dir: Path, secrets):
     """Configure logging: console (docker logs), memory buffer and a private log file."""
     global _secrets, log_dir, _forced_level
@@ -112,8 +139,8 @@ def setup(config_dir: Path, secrets):
         log_dir = config_dir / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         os.chmod(log_dir, 0o700)
-        handlers.append(_PrivateRotatingFile(log_dir / "stowaway.log", maxBytes=1_000_000, backupCount=2,
-                                             encoding="utf-8"))
+        handlers.append(_BufferedFile(_PrivateRotatingFile(log_dir / "stowaway.log", maxBytes=1_000_000,
+                                                           backupCount=2, encoding="utf-8")))
     except OSError as e:
         log_dir = None
         print(f"can't write log files in {config_dir}: {e}")
@@ -164,5 +191,6 @@ def recent_lines(n=400):
 def log_files():
     if not log_dir:
         return []
+    flush()          # so a report includes the lines still waiting in memory
     files = [log_dir / "stowaway.log.2", log_dir / "stowaway.log.1", log_dir / "stowaway.log"]
     return [f for f in files if f.exists()]

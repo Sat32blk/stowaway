@@ -125,7 +125,12 @@ The top of the dashboard shows what sleeping apps save:
 - **Memory freed now** and **CPU freed now:** what the apps asleep right now would be using if they were awake and idle, and how much of the server's RAM and CPU that is.
 - **CPU time saved** over the last 7 days or all time, also shown as CPU cycles, and **Average memory freed** over the same period.
 
-The note under the tiles also shows what **Stowaway itself** uses, so you can see it's worth it. It's built to be light: about 40 MB of memory and under 0.1% of one CPU core while idle (measured with five apps, three of them awake). It follows Docker's event stream instead of repeatedly asking Docker about every app, checks CPU and network use of awake apps every 15 seconds (and once more right before putting one to sleep), and only loads its HTTPS code when HTTPS is turned on.
+The note under the tiles also shows what **Stowaway itself** uses, so you can see it's worth it. It's built to be light: about 40 MB of memory and under 0.1% of one CPU core while idle (measured with five apps, three of them awake). It follows Docker's event stream instead of repeatedly asking Docker about every app, and only loads its HTTPS code when HTTPS is turned on.
+
+It also measures only when someone will read the numbers:
+- **Awake apps** are checked for CPU and network use every 15 seconds while the dashboard page is open, while Stowaway is still learning what an app uses when idle, and in the two minutes before an app would be put to sleep (so a busy app is never slept). The rest of the time it's once a minute.
+- **Containers Stowaway doesn't manage** are measured only while the page is open. The page stops refreshing when its tab is in the background.
+- **Disk:** settings are written when you change them. Bookkeeping (savings figures, what opened an app last) is kept in memory and saved every 15 minutes and when Stowaway stops; the log file is written in batches. If the config folder is on a hard drive, that drive can spin down.
 
 These are estimates. A stopped app uses nothing, so Stowaway learns what each app uses while it's awake but idle (not busy, and at least a minute after starting), and counts that as saved for every second the app sleeps. An app shows as *still learning* until it has run idle for a couple of minutes. Figures are kept in `config/savings.json`.
 
@@ -436,8 +441,11 @@ Logs are also kept in `config/logs/` (up to about 3 MB, readable only by root), 
 | `STOWAWAY_SELF` | `stowaway` | Stowaway's own container name, so it doesn't list itself |
 | `LOG_LEVEL` | `INFO` | `DEBUG` keeps detailed logging on permanently |
 | `MACVLAN_HELPER_IP` | empty | Address for the macvlan helper; overrides System Settings → Network |
-| `STATS_INTERVAL` | `15` | Seconds between CPU/network samples of awake apps (busy detection) |
-| `USAGE_INTERVAL` | `20` | Seconds between CPU/memory samples of the other running containers, for the app list |
+| `STATS_INTERVAL` | `15` | Seconds between CPU/network samples of awake apps while it matters: the page is open, or an app is close to its sleep time |
+| `STATS_IDLE_INTERVAL` | `60` | ... and the rest of the time |
+| `USAGE_INTERVAL` | `20` | Seconds between CPU/memory samples of the other running containers while the dashboard page is open |
+| `USAGE_IDLE_INTERVAL` | `120` | ... and while only Home Assistant or a dashboard is reading them (containers with a restart schedule only) |
+| `SAVE_INTERVAL` | `900` | Seconds between saves of the savings figures and "last opened by" to the config folder (also saved when Stowaway stops) |
 | `IN_USE_SECONDS` | `120` | How long an app shows **In Use** after someone last used it through its link |
 | `DOCKER_HOST` | local socket | Another way to reach Docker, e.g. `tcp://socket-proxy:2375` |
 

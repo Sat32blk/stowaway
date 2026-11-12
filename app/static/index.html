@@ -2573,9 +2573,19 @@ loadDashApps();
 refresh();
 refreshContainers();
 refreshSavings();
-setInterval(refreshSavings, 10000);
-setInterval(refresh, 3000);
-setInterval(refreshContainers, 10000);
+// Refresh only while the page is actually visible: a tab left open in the background
+// shouldn't keep the server measuring containers around the clock.
+const whenVisible = fn => () => { if (!document.hidden) fn(); };
+setInterval(whenVisible(refreshSavings), 10000);
+setInterval(whenVisible(refresh), 3000);
+setInterval(whenVisible(refreshContainers), 10000);
+// Containers Stowaway doesn't manage are only measured while someone is looking, and CPU
+// needs two readings a few seconds apart: ask again shortly after the page appears.
+const soon = () => setTimeout(whenVisible(refreshContainers), 5000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) { refresh(); refreshContainers(); refreshSavings(); soon(); }
+});
+soon();
 </script>
 </body>
 </html>

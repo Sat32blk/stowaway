@@ -42,12 +42,13 @@ def host_info():
 
 
 class Savings:
-    def __init__(self, path: Path, write):
+    def __init__(self, path: Path, write, every: float = 900):
         self.path = path
         self.write = write          # function(path, text) that writes a private file
+        self.every = every          # seconds between saves; the figures live in memory in between
         self.data = {"since": time.time(), "baselines": {}, "totals": {}, "days": {}}
         self.dirty = False
-        self.saved_at = 0.0
+        self.saved_at = time.time()
         try:
             loaded = json.loads(path.read_text())
             self.data.update({k: loaded[k] for k in self.data if k in loaded})
@@ -84,7 +85,7 @@ class Savings:
         self.dirty = True
 
     def flush(self, force=False):
-        if not self.dirty or (not force and time.time() - self.saved_at < 60):
+        if not self.dirty or (not force and time.time() - self.saved_at < self.every):
             return
         days = sorted(self.data["days"])
         for d in days[:-KEEP_DAYS]:

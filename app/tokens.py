@@ -24,7 +24,8 @@ class TokenStore:
     def __init__(self, path: Path):
         self.path = path
         self.tokens: list[dict] = []
-        self._dirty_used = 0.0
+        self._dirty_used = time.time()
+        self._unsaved = False
         try:
             self.tokens = json.loads(path.read_text()).get("tokens", [])
         except (OSError, ValueError):
@@ -67,10 +68,16 @@ class TokenStore:
         if found:
             now = time.time()
             found["last_used"] = now
-            if now - self._dirty_used > 300:        # don't rewrite the file on every request
-                self._dirty_used = now
-                self._save()
+            self._unsaved = True
+            if now - self._dirty_used > 3600:       # "last used" is saved hourly, not on every request
+                self.flush()
         return found
+
+    def flush(self):
+        """Save "last used" times that are only in memory so far (also called when Stowaway stops)."""
+        if self._unsaved:
+            self._dirty_used, self._unsaved = time.time(), False
+            self._save()
 
     @staticmethod
     def public(t: dict) -> dict:

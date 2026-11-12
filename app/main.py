@@ -32,6 +32,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 from urllib.parse import quote, urlsplit
 
+import httpcore
 import httpx
 import uvicorn
 import yaml
@@ -57,8 +58,19 @@ diagnostics.setup(CONFIG_PATH.parent, lambda: [reg.settings.get(k) for k in SECR
                   if "reg" in globals() else [])
 log = logging.getLogger("stowaway")
 DEMO = os.environ.get("STOWAWAY_DEMO") == "1"
+_written: dict[str, str] = {}      # path -> what was last written there, to skip rewrites that change nothing
+# Bookkeeping that isn't worth a disk write every minute (savings figures, what opened an app
+# last) is kept in memory and saved this often, and when Stowaway stops. Fewer writes means
+# less disk activity, and a config folder on a hard drive can let that drive spin down.
+SAVE_EVERY = float(os.environ.get("SAVE_INTERVAL", "900"))
+
+
 def write_private(path: Path, text: str):
-    """Write a file only root can read (settings hold API tokens)."""
+    """Write a file only root can read (settings hold API tokens). Does nothing if the
+    file already holds exactly this text."""
+    key = str(path)
+    if _written.get(key) == text and path.exists():
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -66,6 +78,7 @@ def write_private(path: Path, text: str):
         f.write(text)
     os.chmod(tmp, 0o600)
     tmp.replace(path)
+    _written[key] = text
 
 
 AUTH_REQUIRED = not DEMO or os.environ.get("STOWAWAY_REQUIRE_LOGIN") == "1"
@@ -155,6 +168,8 @@ class DockerDriver:
         self.states: dict[str, str] = {}      # container name -> status, kept current by events
         self.events_live = False
         self._described: dict[str, tuple] = {}  # id -> (state, describe()) for the container list
+        self._gen = 0                           # goes up with every container event
+        self._listed = (-1, 0.0, [])            # (event count, when, result) of the last list()
         self._describe_errors = (dockerapi.DockerError, httpx.HTTPError)
         self.version_info, self.system_info = {}, {}
 
@@ -180,6 +195,7 @@ class DockerDriver:
                 async for ev in self.dk.events({"type": ["container"], "event": self.EVENTS}, since=since):
                     attrs = (ev.get("Actor") or {}).get("Attributes") or {}
                     name = attrs.get("name")
+                    self._gen += 1
                     if not name:
                         continue
                     self._described.pop((ev.get("Actor") or {}).get("ID", ev.get("id")), None)
@@ -204,6 +220,7 @@ class DockerDriver:
 
     async def _resync(self):
         cs = await self.dk.list()
+        self._gen += 1
         self.states = {n.lstrip("/"): c.get("State", "unknown") for c in cs for n in (c.get("Names") or [])[:1]}
 
     async def status(self, name: str) -> str:
@@ -257,8 +274,14 @@ class DockerDriver:
                 "health": (st.get("Health") or {}).get("Status"), "error": st.get("Error") or ""}
 
     async def list(self):
-        """All containers, described. Only containers that changed since the last
-        call are inspected again, so an open dashboard costs one call per refresh."""
+        """All containers, described. While Docker's event stream is live and has reported
+        nothing new, the last answer is reused (for up to a minute), so an open dashboard or
+        the regular background checks don't ask Docker at all. After a change, only the
+        containers that changed are inspected again."""
+        gen, at, cached = self._listed
+        if self.events_live and gen == self._gen and time.time() - at < 60:
+            return [dict(d) for d in cached]
+        gen = self._gen
         summary = await self.dk.list()
         out, seen = [], set()
 
@@ -280,6 +303,7 @@ class DockerDriver:
                 out.append(dict(d))
         for gone in set(self._described) - seen:
             self._described.pop(gone, None)
+        self._listed = (gen, time.time(), [dict(d) for d in out])
         return out
 
     async def check_update(self, name):
@@ -895,7 +919,7 @@ if MACVLAN_HELPER_IP:
         MACVLAN_HELPER_IP = ""
 accounts = AuthStore(CONFIG_PATH.parent / "auth.json")
 api_tokens = TokenStore(CONFIG_PATH.parent / "tokens.json")
-savings = Savings(CONFIG_PATH.parent / "savings.json", lambda path, text: write_private(path, text))
+savings = Savings(CONFIG_PATH.parent / "savings.json", lambda path, text: write_private(path, text), SAVE_EVERY)
 HOST = host_info()
 certmgr = CertManager(CONFIG_PATH.parent, lambda: reg.settings, wanted_names)
 _tasks: set[asyncio.Task] = set()
@@ -920,19 +944,27 @@ class QuietServer(uvicorn.Server):
     def install_signal_handlers(self):  # older uvicorn versions
         pass
 
+    def __init__(self, config):
+        super().__init__(config)
+        self.stop = asyncio.Event()
+
     async def main_loop(self):
-        # uvicorn wakes every 0.1 s per port just to refresh the Date header and
-        # check for shutdown. With a port per app that adds up, so tick once a
-        # second instead (the Date header only has 1-second resolution anyway).
-        counter = 0
-        while not await self.on_tick(counter):
-            await asyncio.sleep(1)
-            counter = (counter + 10) % 864000
+        # uvicorn wakes ten times a second per port to refresh its Date header and check
+        # for shutdown. With a port per app that is constant work for nothing, so this
+        # server sends no Date/Server headers of its own (apps' replies carry theirs) and
+        # simply sleeps until Listeners.close() asks it to stop: an idle port costs no CPU.
+        await self.on_tick(0)
+        await self.stop.wait()
 
 
 def bind_socket(port: int) -> socket.socket:
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # IPPROTO_TCP is named so the event loop recognises the connections as TCP and sends
+    # replies immediately (TCP_NODELAY). Without it every request after the first on a
+    # kept-open connection waited ~40 ms: the reply's headers and body go out as two
+    # writes, and the second was held back until the first was acknowledged.
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)     # inherited by accepted connections
     try:
         s.bind((BIND_HOST, port))
     except OSError:
@@ -967,6 +999,7 @@ class Listeners:
             kw = {"ssl_certfile": str(cert), "ssl_keyfile": str(key)}
         cfg = uvicorn.Config(app, lifespan="off", log_level="warning", access_log=False,
                              proxy_headers=False, timeout_keep_alive=30,
+                             server_header=False, date_header=False, timeout_graceful_shutdown=5,
                              ws="websockets", ws_max_size=64 * 1024 * 1024, **kw)
         server = QuietServer(cfg)
         task = asyncio.create_task(server.serve(sockets=[sock]))
@@ -976,6 +1009,7 @@ class Listeners:
     async def close(self, port: int):
         server, task, _ = self.servers.pop(port)
         server.should_exit = True
+        server.stop.set()
         with contextlib.suppress(Exception):
             await asyncio.wait_for(task, 10)
         log.info("closed port %d", port)
@@ -1013,8 +1047,7 @@ class Listeners:
                         s.error = f"Link port {port} is in use by another program. Pick a different one."
 
     async def close_all(self):
-        for port in list(self.servers):
-            await self.close(port)
+        await asyncio.gather(*(self.close(port) for port in list(self.servers)))
 
 
 listeners = Listeners()
@@ -1403,8 +1436,25 @@ def activity_api(svc: Service) -> dict:
     }
 
 
+# ---- Who is looking: measuring is only worth its cost when someone reads the numbers ----
+# The dashboard page asks for the app list every few seconds while it's open (and visible);
+# Home Assistant and dashboards ask through the API and status addresses.
+watching = {"page": 0.0, "api": 0.0}
+usage_wake = asyncio.Event()
+
+
+def seen(kind: str):
+    watching[kind] = time.time()
+    usage_wake.set()
+
+
+def page_open(now: float | None = None) -> bool:
+    return (now or time.time()) - watching["page"] < 30
+
+
 # ---- CPU and memory of every container, for the app list ----
 USAGE_EVERY = float(os.environ.get("USAGE_INTERVAL", "20"))
+USAGE_SLOW = float(os.environ.get("USAGE_IDLE_INTERVAL", "120"))   # nobody on the page, but the API is read
 USAGE: dict[str, dict] = {}         # container -> {"cpu": %, "mem": MB}, for containers not sampled elsewhere
 _usage_prev: dict[str, dict] = {}
 
@@ -1427,6 +1477,10 @@ async def usage_tick():
         covered.update(svc.companions)
     names = [c["name"] for c in await driver.list()
              if c["status"] == "running" and c["name"] not in covered and c["name"] != SELF_NAME]
+    if not page_open():
+        # Without the page open, only containers with a restart schedule are read by anyone
+        # (Home Assistant, status addresses), so only those are measured.
+        names = [n for n in names if n in reg.maintenance]
     sem = asyncio.Semaphore(6)
 
     async def one(name):
@@ -1450,15 +1504,36 @@ async def usage_tick():
 
 
 async def usage_loop():
+    """Measures the containers Stowaway doesn't manage: every USAGE_EVERY seconds while the
+    dashboard page is open, every USAGE_SLOW seconds while only the API is being read, and
+    not at all when nobody has asked for 10 minutes."""
+    last, warm = 0.0, 0
     while True:
-        await asyncio.sleep(USAGE_EVERY)
+        now = time.time()
+        if page_open(now):
+            every = USAGE_EVERY
+        elif now - watching["api"] < 600 and reg.maintenance:
+            every = USAGE_SLOW
+        else:
+            USAGE.clear()
+            _usage_prev.clear()
+            warm = 0
+            usage_wake.clear()
+            await usage_wake.wait()          # sleeps here, costing nothing, until someone looks
+            continue
+        if warm < 2:
+            every = min(every, 3)            # CPU needs two readings: take the first two close together
+        wait = last + every - now
+        if wait > 0:
+            await asyncio.sleep(min(wait, 5))
+            continue
+        last, warm = now, warm + 1
         try:
             await usage_tick()
         except asyncio.CancelledError:
             raise
         except Exception:
             log.debug("usage sampling failed", exc_info=True)
-        save_opened()
 
 
 # ---- What opened (or woke) each app last ----
@@ -1476,10 +1551,13 @@ def load_opened():
             opened = {k: v for k, v in data.items() if isinstance(v, dict)}
 
 
-def save_opened():
-    global _opened_dirty
-    if _opened_dirty:
-        _opened_dirty = False
+_opened_saved = time.time()
+
+
+def save_opened(force: bool = False):
+    global _opened_dirty, _opened_saved
+    if _opened_dirty and (force or time.time() - _opened_saved >= SAVE_EVERY):
+        _opened_dirty, _opened_saved = False, time.time()
         with contextlib.suppress(Exception):
             write_private(OPENED_PATH, json.dumps(opened))
 
@@ -1636,11 +1714,27 @@ async def update_check_loop():
             raise
         except Exception:
             log.exception("update checks")
-        save_opened()
         await asyncio.sleep(300)
 
 
 STATS_EVERY = float(os.environ.get("STATS_INTERVAL", "15"))   # seconds between CPU/network samples
+STATS_SLOW = float(os.environ.get("STATS_IDLE_INTERVAL", "60"))  # ... when the exact moment doesn't matter
+
+
+def sample_every(svc: Service, now: float, idle_for: float, reason) -> float:
+    """How often to measure an awake app. Every STATS_EVERY seconds while it matters: the
+    dashboard page is open, Stowaway is still learning what the app uses when idle, or the
+    app is within two minutes of being put to sleep (so "is it busy?" is answered from
+    fresh readings). Otherwise every STATS_SLOW seconds, which is enough to notice a busy
+    app and keeps Docker from being asked about every app all day."""
+    if page_open(now):
+        return STATS_EVERY
+    b = savings.data["baselines"].get(svc.name)
+    if not b or b["n"] < 20:
+        return STATS_EVERY
+    if not reason and svc.idle_timeout > 0 and svc.idle_timeout - idle_for < 120:
+        return STATS_EVERY
+    return max(STATS_EVERY, STATS_SLOW)
 
 
 async def check(svc: Service, now: float):
@@ -1666,10 +1760,10 @@ async def check(svc: Service, now: float):
     about_to_stop = (not reason and svc.status == "running" and svc.idle_timeout > 0
                      and svc.active == 0 and idle_for > svc.idle_timeout)
     if svc.status == "running":
-        # Sample CPU/network every STATS_EVERY seconds, and always just before a stop,
+        # Sample CPU/network regularly (see sample_every), and always just before a stop,
         # so an app that just got busy isn't put to sleep.
         last = svc.sample["t"] if svc.sample else 0
-        if now - last >= STATS_EVERY or (about_to_stop and now - last >= REAP_INTERVAL):
+        if now - last >= sample_every(svc, now, idle_for, reason) or (about_to_stop and now - last >= REAP_INTERVAL):
             await sample_activity(svc, now)
     else:
         svc.stats, svc.sample, svc.busy_now = None, None, False
@@ -1717,8 +1811,10 @@ async def reaper():
                 log.exception("check failed for %s", svc.name)
         try:
             savings.flush()
+            save_opened()
         except Exception:
             log.exception("couldn't save savings figures")
+        diagnostics.flush(if_older=60)
         if diagnostics.tick():
             reg.settings["debug_until"] = 0
             reg.save()
@@ -1969,6 +2065,7 @@ async def container_status(name: str):
     m = maint_brief(name)
     if not m:
         return None
+    seen("api")
     cached = driver.cached_status(name)
     st = cached if cached is not None else await driver.status(name)
     if st == "missing":
@@ -2367,7 +2464,9 @@ async def startup():
         except Exception as e:
             svc.error = str(e)
     _own_samples.append((time.time(), sum(os.times()[:2])))
-    app.state.http = httpx.AsyncClient(timeout=httpx.Timeout(None, connect=5), follow_redirects=False)
+    # Connections to the apps, kept open for a few seconds between requests (see forward()).
+    app.state.pool = httpcore.AsyncConnectionPool(max_connections=1000, max_keepalive_connections=40,
+                                                  keepalive_expiry=5)
     app.state.reaper = asyncio.create_task(reaper())
     app.state.maintenance = asyncio.create_task(maintenance_loop())
     app.state.peers = asyncio.create_task(macvlan_peers_loop())
@@ -2375,10 +2474,19 @@ async def startup():
     app.state.upd_checks = asyncio.create_task(update_check_loop())
 
 
+def save_state():
+    """Write everything that's only in memory: savings figures, what opened each app last,
+    when API tokens were last used, buffered log lines."""
+    save_opened(force=True)
+    with contextlib.suppress(Exception):
+        savings.flush(force=True)
+    with contextlib.suppress(Exception):
+        api_tokens.flush()
+    diagnostics.flush()
+
+
 async def shutdown():
-    global _opened_dirty
-    _opened_dirty = True
-    save_opened()
+    save_state()
     app.state.usage.cancel()
     app.state.upd_checks.cancel()
     app.state.peers.cancel()
@@ -2387,7 +2495,7 @@ async def shutdown():
     app.state.watch.cancel()
     with contextlib.suppress(Exception):
         savings.flush(force=True)
-    await app.state.http.aclose()
+    await app.state.pool.aclose()
 
 
 @contextlib.asynccontextmanager
@@ -2803,6 +2911,7 @@ async def change_account(request: Request, body: AccountIn):
 
 @admin.get("/api/services")
 async def list_services():
+    seen("page")
     async def refresh(svc):
         if not svc.transition:
             try:
@@ -2870,6 +2979,7 @@ async def get_savings():
 
 @admin.get("/api/containers")
 async def list_containers():
+    seen("page")
     infos = await driver.list()
     mv = await driver.macvlans()
     taken = {s.link_port for s in reg.services.values() if s.link_port} | {DASHBOARD_PORT}
@@ -4583,7 +4693,21 @@ def start_page(request: Request, svc: Service, preview: str | None = None,
                                  "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"})
 
 
+_HOP_B = {h.encode() for h in HOP_BY_HOP}
+_DROP_B = _HOP_B | {h.encode() for h in SPOOFABLE} | {b"cookie"}
+_REDIRECT_B = {b"location", b"content-location", b"refresh"}
+_COOKIE_B = COOKIE.encode()
+_UPSTREAM_TIMEOUT = {"timeout": {"connect": 5.0, "read": None, "write": None, "pool": None}}
+SMALL_REPLY = 64 * 1024      # replies up to this size (when the app states the size) are passed on in one piece
+
+
 async def forward(request: Request, svc: Service, retry: bool = True, passive: bool = False):
+    """Pass one request on to the app and its reply back.
+
+    This runs for every request to every app, so it is kept lean: it talks to the app
+    through httpcore's connection pool directly (no per-request client objects), works on
+    the raw header bytes, and passes small replies on in one piece instead of setting up
+    a streamed response for them."""
     if DEMO:
         return HTMLResponse(f"<h1>Hello from {svc.name}</h1><p>(demo mode: no real container behind this)</p>")
     if not svc.upstream:
@@ -4591,39 +4715,51 @@ async def forward(request: Request, svc: Service, retry: bool = True, passive: b
         if not svc.upstream:
             return JSONResponse({"error": f"can't find a way to reach {svc.container}"}, 502)
 
-    url = svc.upstream.rstrip("/") + request.url.path
-    if request.url.query:
-        url += "?" + request.url.query
+    scope = request.scope
+    url = svc.upstream.rstrip("/") + (scope.get("raw_path") or scope["path"].encode()).decode("latin-1")
+    if scope.get("query_string"):
+        url += "?" + scope["query_string"].decode("latin-1")
     # Visitors can't be allowed to claim an address: apps may skip their login
     # for "local" addresses, so drop whatever they sent and state the real one.
-    headers = [(k, v) for k, v in request.headers.items()
-               if k.lower() not in HOP_BY_HOP and k.lower() not in SPOOFABLE and k.lower() != "cookie"]
-    # Pass the visitor's cookies on, minus Stowaway's own session cookie.
-    cookies = [c for c in request.headers.get("cookie", "").split(";")
-               if c.strip() and c.split("=", 1)[0].strip() != COOKIE]
+    # Their cookies are passed on, minus Stowaway's own session cookie.
+    headers, cookies, host, sized, has_body = [], [], b"", False, False
+    for k, v in scope["headers"]:
+        if k not in _DROP_B:
+            headers.append((k, v))
+            if k == b"host":
+                host = v
+            elif k == b"content-length":
+                sized = has_body = True
+        elif k == b"cookie":
+            cookies += [c for c in v.split(b";") if c.strip() and c.split(b"=", 1)[0].strip() != _COOKIE_B]
+        elif k == b"transfer-encoding":
+            has_body = True
     if cookies:
-        headers.append(("cookie", ";".join(cookies).strip()))
+        headers.append((b"cookie", b";".join(cookies).strip()))
+    if has_body and not sized:
+        headers.append((b"transfer-encoding", b"chunked"))     # the body is passed on as it arrives
     client_ip = request.client.host if request.client else ""
+    ip = client_ip.encode("latin-1")
     headers += [
-        ("x-forwarded-for", client_ip),
-        ("x-real-ip", client_ip),
-        ("x-forwarded-host", request.headers.get("host", "")),
-        ("x-forwarded-proto", request.url.scheme),
+        (b"connection", b"keep-alive"),
+        (b"x-forwarded-for", ip),
+        (b"x-real-ip", ip),
+        (b"x-forwarded-host", host),
+        (b"x-forwarded-proto", scope.get("scheme", "http").encode()),
     ]
-    has_body = "content-length" in request.headers or "transfer-encoding" in request.headers
 
-    client: httpx.AsyncClient = request.app.state.http
+    pool: httpcore.AsyncConnectionPool = request.app.state.pool
     n = 0 if passive else 1          # dashboard status checks don't count as use
     svc.active += n
     if n:
         svc.last_use = time.time()
     try:
-        req = client.build_request(request.method, url, headers=headers,
-                                   content=request.stream() if has_body else None)
-        resp = await client.send(req, stream=True)
-        log.debug("%s %s for %s from %s -> %d", request.method, request.url.path, svc.name, client_ip,
-                  resp.status_code)
-    except (httpx.ConnectError, httpx.ConnectTimeout):
+        resp = await pool.handle_async_request(httpcore.Request(
+            scope["method"], url, headers=headers, content=request.stream() if has_body else None,
+            extensions=_UPSTREAM_TIMEOUT))
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug("%s %s for %s from %s -> %d", scope["method"], scope["path"], svc.name, client_ip, resp.status)
+    except (httpcore.ConnectError, httpcore.ConnectTimeout):
         svc.active -= n
         # Stopped or recreated outside of us (new IP): look it up again, start, retry once.
         svc.status = await driver.status(svc.container)
@@ -4639,18 +4775,43 @@ async def forward(request: Request, svc: Service, retry: bool = True, passive: b
         svc.active -= n
         raise
 
-    async def finished():
-        await resp.aclose()
-        svc.active -= n
-        if not passive:
-            svc.last_activity = svc.last_use = time.time()
+    done = False
 
-    out = StreamingResponse(resp.aiter_raw(), status_code=resp.status_code,
-                            background=BackgroundTask(finished))
-    out.raw_headers = [
-        (k.encode("latin-1"), fix_redirect(k, v, svc, request).encode("latin-1"))
-        for k, v in resp.headers.multi_items() if k.lower() not in HOP_BY_HOP
-    ]
+    async def finished():
+        nonlocal done
+        if done:
+            return
+        done = True
+        try:
+            await resp.aclose()
+        finally:
+            svc.active -= n
+            if not passive:
+                svc.last_activity = svc.last_use = time.time()
+
+    out_headers, length = [], None
+    for k, v in resp.headers:
+        kl = k.lower()
+        if kl in _HOP_B:
+            continue
+        if kl in _REDIRECT_B and svc.own_addrs:
+            v = fix_redirect(kl.decode(), v.decode("latin-1"), svc, request).encode("latin-1")
+        elif kl == b"content-length":
+            with contextlib.suppress(ValueError):
+                length = int(v)
+        out_headers.append((kl, v))
+
+    if length is not None and length <= SMALL_REPLY and scope["method"] != "HEAD":
+        # Most replies (pages, API answers, icons): read it and hand it over in one piece.
+        try:
+            body = b"".join([chunk async for chunk in resp.aiter_stream()])
+        finally:
+            await finished()
+        out = Response(body, status_code=resp.status)
+    else:
+        # Downloads, video, live streams, replies of unknown size: passed on as they arrive.
+        out = StreamingResponse(resp.aiter_stream(), status_code=resp.status, background=BackgroundTask(finished))
+    out.raw_headers = out_headers
     return out
 
 
@@ -4908,6 +5069,7 @@ async def main():
         loop.add_signal_handler(sig, stop_event.set)
     await stop_event.wait()
     log.info("shutting down")
+    save_state()                     # first, in case Docker's stop timeout cuts the rest short
     await listeners.close_all()
     await shutdown()
 
