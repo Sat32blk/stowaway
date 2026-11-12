@@ -69,6 +69,10 @@ def write_private(path: Path, text: str):
     """Write a file only root can read (settings hold API tokens). Does nothing if the
     file already holds exactly this text."""
     key = str(path)
+    if key not in _written:
+        # First save since starting: compare with what is on disk, once.
+        with contextlib.suppress(OSError, ValueError):
+            _written[key] = path.read_text()
     if _written.get(key) == text and path.exists():
         return
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1001,6 +1005,7 @@ class Listeners:
                              proxy_headers=False, timeout_keep_alive=30,
                              server_header=False, date_header=False, timeout_graceful_shutdown=5,
                              ws="websockets", ws_max_size=64 * 1024 * 1024, **kw)
+        logging.getLogger("uvicorn.error").addFilter(_no_reply_cut_dumps)    # (adding it twice does nothing)
         server = QuietServer(cfg)
         task = asyncio.create_task(server.serve(sockets=[sock]))
         self.servers[port] = (server, task, tls)
@@ -1678,7 +1683,7 @@ def update_state(name: str) -> dict:
     }
 
 
-async def check_container_update(name: str) -> dict:
+async def check_container_update(name: str, save: bool = True) -> dict:
     now = time.time()
     try:
         info = await asyncio.wait_for(driver.check_update(name), 30)
@@ -1691,13 +1696,15 @@ async def check_container_update(name: str) -> dict:
     if svc:
         svc.update_info = info
         svc.update_checked = now
-    reg.save()
+    if save:
+        reg.save()
     return info
 
 
 async def update_check_loop():
     await asyncio.sleep(90)
     while True:
+        checked = 0
         try:
             for c in await driver.list():
                 name = c["name"]
@@ -1708,12 +1715,15 @@ async def update_check_loop():
                     continue
                 last = (latest_update_info(name) or {}).get("at") or 0
                 if time.time() - last >= every * 3600:
-                    await check_container_update(name)
+                    await check_container_update(name, save=False)
+                    checked += 1
                     await asyncio.sleep(2)            # go easy on the registries
         except asyncio.CancelledError:
             raise
         except Exception:
             log.exception("update checks")
+        if checked:
+            reg.save()        # one write for the whole round, not one per container
         await asyncio.sleep(300)
 
 
@@ -2478,6 +2488,8 @@ def save_state():
     """Write everything that's only in memory: savings figures, what opened each app last,
     when API tokens were last used, buffered log lines."""
     save_opened(force=True)
+    with contextlib.suppress(Exception):
+        reg.save()                   # (nothing is written if nothing changed)
     with contextlib.suppress(Exception):
         savings.flush(force=True)
     with contextlib.suppress(Exception):
@@ -3533,6 +3545,7 @@ async def heimdall_tile(body: HeimdallTileIn):
         raise HTTPException(500, "Heimdall didn't say whether the tile was saved.")
     msg += (": it opens the Stowaway dashboard and shows how many apps are awake and what sleeping them frees."
             if item["name"] == SELF else f": it opens {item['name']} through Stowaway and shows whether it's awake.") + icon_note
+    _heimdall_seen.clear()
     record_dash("heimdall", [item["name"]])
     log.info("%s", msg)
     return {"ok": True, "message": msg}
@@ -3918,11 +3931,27 @@ echo json_encode(['mode' => $mode, 'tags' => $tags->map(fn ($t) => ['id' => $t->
 """
 
 
+_heimdall_seen: dict[str, tuple] = {}     # container -> (when, heimdall_info), reused for a minute
+
+
 async def heimdall_info(container: str) -> dict:
-    """Heimdall's grouping mode and tags, or {} if it can't be read."""
+    """Heimdall's grouping mode and tags, or {} if it can't be read. Asking means copying a
+    small script into Heimdall and running it there, so the answer is reused for a minute
+    (opening one app's Dashboards tab after another asks every time) and dropped when a
+    tile is added or changed."""
     if DEMO:
         return {"mode": "categories", "tags": [{"id": 19, "title": "Servers"}, {"id": 22, "title": "Media Servers"}],
                 "tiles": {n: [22] for n in (reg.settings.get("dash_apps") or {}).get("heimdall") or []}}
+    at, info = _heimdall_seen.get(container, (0, None))
+    if info and time.time() - at < 60:
+        return info
+    info = await _heimdall_info(container)
+    if info:
+        _heimdall_seen[container] = (time.time(), info)
+    return info
+
+
+async def _heimdall_info(container: str) -> dict:
     with contextlib.suppress(Exception):
         apps_dir, _ = await heimdall_paths(container)
         script = f"{apps_dir}/.stowaway-info.php"
@@ -4699,6 +4728,22 @@ _REDIRECT_B = {b"location", b"content-location", b"refresh"}
 _COOKIE_B = COOKIE.encode()
 _UPSTREAM_TIMEOUT = {"timeout": {"connect": 5.0, "read": None, "write": None, "pool": None}}
 SMALL_REPLY = 64 * 1024      # replies up to this size (when the app states the size) are passed on in one piece
+# The app hung up, went quiet or sent something that isn't HTTP (it crashed, was stopped
+# mid-reply, ...): an everyday event that deserves one plain line, not an error dump.
+_UPSTREAM_ERRORS = (httpcore.NetworkError, httpcore.ProtocolError, httpcore.TimeoutException)
+
+
+class ReplyCut(Exception):
+    """The app's reply ended early after part of it was already sent on. Raising this closes
+    the visitor's connection, so a cut-off download isn't mistaken for a complete one."""
+
+
+class _NoReplyCutDumps(logging.Filter):
+    def filter(self, record):
+        return not (record.exc_info and isinstance(record.exc_info[1], ReplyCut))
+
+
+_no_reply_cut_dumps = _NoReplyCutDumps()
 
 
 async def forward(request: Request, svc: Service, retry: bool = True, passive: bool = False):
@@ -4771,6 +4816,10 @@ async def forward(request: Request, svc: Service, retry: bool = True, passive: b
                 return JSONResponse({"error": str(e)}, 502)
             return await forward(request, svc, retry=False, passive=passive)
         return JSONResponse({"error": f"could not reach {svc.name}"}, 502)
+    except _UPSTREAM_ERRORS as e:
+        svc.active -= n
+        log.debug("%s %s for %s: no usable reply (%s)", scope["method"], scope["path"], svc.name, e or type(e).__name__)
+        return JSONResponse({"error": f"{svc.name} closed the connection without a complete reply"}, 502)
     except Exception:
         svc.active -= n
         raise
@@ -4805,12 +4854,26 @@ async def forward(request: Request, svc: Service, retry: bool = True, passive: b
         # Most replies (pages, API answers, icons): read it and hand it over in one piece.
         try:
             body = b"".join([chunk async for chunk in resp.aiter_stream()])
+        except _UPSTREAM_ERRORS as e:
+            log.debug("%s %s for %s: reply cut short (%s)", scope["method"], scope["path"], svc.name, e or type(e).__name__)
+            return JSONResponse({"error": f"{svc.name} closed the connection without a complete reply"}, 502)
         finally:
             await finished()
         out = Response(body, status_code=resp.status)
     else:
         # Downloads, video, live streams, replies of unknown size: passed on as they arrive.
-        out = StreamingResponse(resp.aiter_stream(), status_code=resp.status, background=BackgroundTask(finished))
+        async def passed_on():
+            try:
+                async for chunk in resp.aiter_stream():
+                    yield chunk
+            except _UPSTREAM_ERRORS as e:
+                log.debug("%s %s for %s: reply cut short (%s)", scope["method"], scope["path"], svc.name,
+                          e or type(e).__name__)
+                raise ReplyCut() from None
+            finally:
+                await finished()         # also when the visitor hangs up or the app does
+
+        out = StreamingResponse(passed_on(), status_code=resp.status, background=BackgroundTask(finished))
     out.raw_headers = out_headers
     return out
 
